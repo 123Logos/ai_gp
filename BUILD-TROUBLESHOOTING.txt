@@ -1,0 +1,61 @@
+Maven / Spring Boot 构建问题：PKIX path building failed
+============================================================
+
+现象
+----
+下载 org.springframework.boot:spring-boot-starter-parent:pom 时出现：
+sun.security.validator.ValidatorException: PKIX path building failed:
+unable to find valid certification path to requested target
+
+含义：当前 JDK 在访问 HTTPS（repo.maven.apache.org 等）时，不信任对方证书链。
+Spring Boot 4.0.6 在 Central 上存在，通常不是“版本写错”，而是 TLS 信任或网络环境问题。
+
+
+可行方案（按推荐顺序）
+----------------------
+
+1) 使用 Maven 国内镜像（常被墙或访问 Central 慢时可先试）
+   - 将本目录下的 maven-settings-aliyun.xml.example 复制为：
+     %USERPROFILE%\.m2\settings.xml
+   - 重新执行：.\mvnw.cmd spring-boot:run
+   - 若仍为 PKIX：说明所有 HTTPS 仓库都不被当前 JDK 信任，继续下面步骤。
+
+
+2) 公司代理 / 抓包 / 杀毒 “HTTPS 扫描”
+   - 公司网络会注入自签根证书，必须导入到当前所用 JDK 的 cacerts，例如：
+     keytool -importcert -alias corp-root -file corp-root.cer
+       -keystore "%JAVA_HOME%\lib\security\cacerts" -storepass changeit
+   - 向 IT 索取根证书（.cer），并确认命令行里的 JAVA_HOME 与“正在跑 Maven 的 JDK”是同一个。
+   - 临时关闭杀毒对 HTTPS 的扫描做对比测试（仅用于定位问题）。
+
+
+3) 使用完整发行版 JDK（避免裁切/损坏的 truststore）
+   - 推荐：Eclipse Temurin 21 等官方安装包，安装后让 PATH、JAVA_HOME 指向它。
+   - 若使用 conda 的 JDK，偶发 cacerts 异常，可换用独立安装 JDK 再试。
+
+
+4) 检查本机时间
+   - 系统时间严重错误会导致证书校验失败。
+
+
+5) 仅作排障的“临时绕过 SSL 校验”（不安全，勿用于生产）
+   - 仅在确认是个人环境且无敏感流量时使用。
+   - 可在单次 Maven 命令中加参数（具体属性名因 Maven/Wagon 版本可能不同，需查阅当前 Maven 文档）。
+   - 更稳妥仍是修复信任链（方案 2）。
+
+
+验证 JDK 与 Maven 使用的 Java 是否一致
+--------------------------------------
+where java
+java -version
+echo %JAVA_HOME%
+
+在项目目录执行：
+.\mvnw.cmd -v
+输出中的 Java version 应与预期 JDK 一致。
+
+
+仍无法解决时
+------------
+- 把完整错误日志（含 -e）发到团队或 IT，说明是公司 SSL 还是本机 JDK。
+- 可在能联网且 Maven 正常的机器上构建一次，将本地仓库 .m2/repository 按需拷贝（注意版权与一致性），作为离线权宜之计。
