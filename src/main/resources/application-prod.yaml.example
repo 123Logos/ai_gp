@@ -8,7 +8,7 @@ server:
 # 数据库配置 (服务器 MySQL)
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/ai_planner_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=true
+    url: jdbc:mysql://localhost:3306/ai_gp?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=true
     username: your_prod_db_user
     password: your_prod_db_password
     driver-class-name: com.mysql.cj.jdbc.Driver
