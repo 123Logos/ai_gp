@@ -33,3 +33,9 @@ build/
 
 ### VS Code ###
 .vscode/
+.claude/settings.local.json
+.codebuddy\plans\用户系统API接口文档_d80fe9b0.md
+
+### 敏感配置文件 - 本地开发和服务器配置不提交 ###
+src/main/resources/application-dev.yaml
+src/main/resources/application-prod.yaml
