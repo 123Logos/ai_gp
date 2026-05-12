@@ -23,7 +23,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
-@Table(name = "ai_invoke_log")
+@Table(name = "ai_invoke_logs")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -31,8 +31,7 @@ public class AiInvokeLog {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "log_id")
-	private Long logId;
+	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "user_id")
@@ -46,10 +45,10 @@ public class AiInvokeLog {
 	@Column(name = "invoke_type", nullable = false, length = 20)
 	private AiInvokeType invokeType;
 
-	@Column(length = 20)
-	private String provider;
+	@Column(length = 20, nullable = false)
+	private String provider = "qwen";
 
-	@Column(length = 30)
+	@Column(length = 30, nullable = false)
 	private String model;
 
 	@Column(columnDefinition = "text")
@@ -61,18 +60,18 @@ public class AiInvokeLog {
 	@Column(name = "completion_tokens")
 	private Integer completionTokens;
 
-	@Column(name = "cost_cny", precision = 12, scale = 4)
+	@Column(name = "cost_cny", precision = 10, scale = 6)
 	private BigDecimal costCny;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 10)
-	private AiInvokeStatus status;
+	private AiInvokeStatus status = AiInvokeStatus.SUCCESS;
 
 	@Column(name = "response_time_ms")
 	private Integer responseTimeMs;
 
-	@Column(name = "trace_id", length = 64)
-	private String traceId;
+	@Column(name = "error_message", length = 500)
+	private String errorMessage;
 
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)

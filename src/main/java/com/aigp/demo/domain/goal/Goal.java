@@ -15,6 +15,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.Getter;
@@ -24,7 +25,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "goal")
+@Table(name = "goals")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -32,8 +33,7 @@ public class Goal {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "goal_id")
-	private Long goalId;
+	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "user_id", nullable = false)
@@ -57,10 +57,13 @@ public class Goal {
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
-	private GoalStatus status;
+	private GoalStatus status = GoalStatus.DECOMPOSING;
 
 	@Column(name = "milestones_json", columnDefinition = "json")
 	private String milestonesJson;
+
+	@Column(precision = 5, scale = 2, nullable = false)
+	private BigDecimal progress = BigDecimal.ZERO;
 
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)

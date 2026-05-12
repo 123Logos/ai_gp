@@ -14,7 +14,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "app_user")
+@Table(name = "users")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,14 +22,10 @@ public class AppUser {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "user_id")
-	private Long userId;
+	private Long id;
 
-	@Column(nullable = false, length = 64)
-	private String openid;
-
-	@Column(length = 64)
-	private String unionid;
+	@Column(nullable = false, unique = true, length = 16)
+	private String uid;
 
 	@Column(length = 50)
 	private String nickname;
@@ -40,17 +36,14 @@ public class AppUser {
 	@Column(name = "weekly_hours")
 	private Integer weeklyHours;
 
-	@Column(name = "current_career", length = 100)
-	private String currentCareer;
+	@Column(nullable = false)
+	private Byte status = 1;
 
-	@Column(name = "interest_domains", columnDefinition = "json")
-	private String interestDomains;
+	@Column(nullable = false, length = 50)
+	private String timezone = "Asia/Shanghai";
 
-	@Column(name = "last_active_at")
-	private LocalDateTime lastActiveAt;
-
-	@Column(name = "profile_completed", nullable = false)
-	private boolean profileCompleted;
+	@Column(nullable = false, length = 10)
+	private String language = "zh-CN";
 
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)

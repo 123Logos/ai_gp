@@ -17,32 +17,31 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "user_subscription_pref")
+@Table(name = "user_notification_settings")
 @Getter
 @Setter
 @NoArgsConstructor
-public class UserSubscriptionPref {
+public class UserNotificationSettings {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "pref_id")
-	private Long prefId;
+	private Long id;
 
 	@OneToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "user_id", nullable = false, unique = true)
 	private AppUser user;
 
-	@Column(name = "daily_reminder", nullable = false)
-	private boolean dailyReminder = true;
+	@Column(name = "daily_task_reminder", nullable = false)
+	private boolean dailyTaskReminder = true;
 
-	@Column(name = "conflict_notify", nullable = false)
-	private boolean conflictNotify = true;
+	@Column(name = "conflict_alert", nullable = false)
+	private boolean conflictAlert = true;
 
-	@Column(name = "milestone_celebrate", nullable = false)
-	private boolean milestoneCelebrate = true;
+	@Column(name = "milestone_celebration", nullable = false)
+	private boolean milestoneCelebration = true;
 
-	@Column(name = "lag_warning", nullable = false)
-	private boolean lagWarning = true;
+	@Column(name = "lagging_warning", nullable = false)
+	private boolean laggingWarning = true;
 
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)

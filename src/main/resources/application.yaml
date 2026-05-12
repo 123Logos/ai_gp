@@ -1,27 +1,59 @@
-# ========================================
-# 公共配置 - 提交到 Git，所有环境共享
-# ========================================
+# 公共配置（提交到 Git）。数据库表请在 MySQL 中按 md文档/数据库.md 手工执行建表语句。
+# 本地/生产敏感项放在 application-dev.yaml、application-prod.yaml（已被 .gitignore）或 .env 中。
 
 spring:
   application:
     name: ai-planner
 
-  # 激活环境: dev / prod (通过环境变量或命令行指定)
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
-  # Jackson 序列化
   jackson:
     time-zone: Asia/Shanghai
     date-format: yyyy-MM-dd HH:mm:ss
     serialization:
       write-dates-as-timestamps: false
 
-# 项目自定义配置
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:aigp}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: false
+
+server:
+  port: ${PORT:8000}
+
 app:
-  # 文件上传路径
   upload-path: /data/uploads
-  # 跨域配置
   cors:
     allowed-origins: "*"
     allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+  jwt:
+    secret-key: ${JWT_SECRET_KEY:}
+    access-token-expire-minutes: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:1440}
+  admin:
+    bootstrap:
+      username: ${ADMIN_USERNAME:admin}
+      password: ${ADMIN_PASSWORD:}
+  llm:
+    api-key: ${LLM_API_KEY:}
+    base-url: ${LLM_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+    model: ${LLM_MODEL:qwen3.5-flash}
+  vlm:
+    api-key: ${VLM_API_KEY:}
+    base-url: ${VLM_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+    model: ${VLM_MODEL:qwen-vl-max-latest}

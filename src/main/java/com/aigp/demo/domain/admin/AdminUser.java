@@ -1,7 +1,10 @@
 package com.aigp.demo.domain.admin;
 
+import com.aigp.demo.domain.enums.AdminRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -14,7 +17,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "admin_user")
+@Table(name = "admin_users")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,20 +25,26 @@ public class AdminUser {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "admin_id")
-	private Long adminId;
+	private Long id;
 
-	@Column(nullable = false, unique = true, length = 64)
+	@Column(nullable = false, unique = true, length = 50)
 	private String username;
 
 	@Column(name = "password_hash", nullable = false, length = 255)
 	private String passwordHash;
 
-	@Column(nullable = false, length = 32)
-	private String role = "OPERATOR";
+	@Column(name = "real_name", length = 50)
+	private String realName;
+
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, length = 20)
+	private AdminRole role = AdminRole.OPERATOR;
 
 	@Column(nullable = false)
-	private boolean enabled = true;
+	private Byte status = 1;
+
+	@Column(name = "last_login_at")
+	private LocalDateTime lastLoginAt;
 
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)

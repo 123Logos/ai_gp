@@ -1,7 +1,6 @@
-package com.aigp.demo.domain.admin;
+package com.aigp.demo.domain.goal;
 
-import com.aigp.demo.domain.enums.DecompositionIssueType;
-import com.aigp.demo.domain.goal.Goal;
+import com.aigp.demo.domain.enums.MilestoneStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,43 +12,56 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "goal_decomposition_review")
+@Table(name = "milestones")
 @Getter
 @Setter
 @NoArgsConstructor
-public class GoalDecompositionReview {
+public class Milestone {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "review_id")
-	private Long reviewId;
+	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "goal_id", nullable = false)
 	private Goal goal;
 
-	@Column
-	private Integer score;
+	@Column(nullable = false, length = 200)
+	private String name;
+
+	@Column(name = "sort_order", nullable = false)
+	private Integer sortOrder = 0;
+
+	@Column(name = "estimated_weeks", precision = 3, scale = 1)
+	private BigDecimal estimatedWeeks;
+
+	@Column(length = 500)
+	private String deliverable;
+
+	@Column(columnDefinition = "json")
+	private String dependencies;
 
 	@Enumerated(EnumType.STRING)
-	@Column(name = "issue_type", length = 40)
-	private DecompositionIssueType issueType;
+	@Column(nullable = false, length = 20)
+	private MilestoneStatus status = MilestoneStatus.PENDING;
 
-	@Column(length = 1000)
-	private String remark;
-
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "reviewer_admin_id", nullable = false)
-	private AdminUser reviewer;
+	@Column(name = "completed_at")
+	private LocalDateTime completedAt;
 
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
+
+	@UpdateTimestamp
+	@Column(name = "updated_at", nullable = false)
+	private LocalDateTime updatedAt;
 }

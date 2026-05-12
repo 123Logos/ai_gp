@@ -17,7 +17,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "ai_prompt")
+@Table(name = "ai_prompts")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -25,8 +25,7 @@ public class AiPrompt {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "prompt_id")
-	private Long promptId;
+	private Long id;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
@@ -35,8 +34,8 @@ public class AiPrompt {
 	@Column(nullable = false, length = 20)
 	private String version;
 
-	@Column(length = 20)
-	private String provider;
+	@Column(length = 20, nullable = false)
+	private String provider = "qwen";
 
 	@Column(nullable = false, columnDefinition = "text")
 	private String content;
@@ -47,8 +46,8 @@ public class AiPrompt {
 	@Column(name = "is_ab_test", nullable = false)
 	private boolean abTest;
 
-	@Column(name = "ab_test_bucket", length = 32)
-	private String abTestBucket;
+	@Column(name = "test_group", length = 10)
+	private String testGroup;
 
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)

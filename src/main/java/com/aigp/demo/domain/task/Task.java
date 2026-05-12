@@ -2,6 +2,7 @@ package com.aigp.demo.domain.task;
 
 import com.aigp.demo.domain.enums.TaskStatus;
 import com.aigp.demo.domain.goal.Goal;
+import com.aigp.demo.domain.goal.Milestone;
 import com.aigp.demo.domain.plan.Plan;
 import com.aigp.demo.domain.user.AppUser;
 import jakarta.persistence.Column;
@@ -24,7 +25,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "task")
+@Table(name = "tasks")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -32,8 +33,7 @@ public class Task {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "task_id")
-	private Long taskId;
+	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "plan_id", nullable = false)
@@ -47,17 +47,21 @@ public class Task {
 	@JoinColumn(name = "user_id", nullable = false)
 	private AppUser user;
 
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "milestone_id")
+	private Milestone milestone;
+
 	@Column(nullable = false, length = 200)
 	private String title;
 
 	@Column(length = 1000)
 	private String description;
 
-	@Column(name = "scheduled_date")
+	@Column(name = "scheduled_date", nullable = false)
 	private LocalDate scheduledDate;
 
-	@Column(name = "estimated_minutes")
-	private Integer estimatedMinutes;
+	@Column(name = "estimated_minutes", nullable = false)
+	private Integer estimatedMinutes = 0;
 
 	@Column(name = "actual_minutes")
 	private Integer actualMinutes;
@@ -66,23 +70,14 @@ public class Task {
 	private Integer qualityScore;
 
 	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 10)
-	private TaskStatus status;
+	@Column(nullable = false, length = 20)
+	private TaskStatus status = TaskStatus.PENDING;
 
 	@Column(name = "skip_reason", length = 500)
 	private String skipReason;
 
 	@Column(name = "completed_at")
 	private LocalDateTime completedAt;
-
-	@Column(name = "milestone_index")
-	private Integer milestoneIndex;
-
-	@Column(name = "sort_order", nullable = false)
-	private Integer sortOrder = 0;
-
-	@Column(name = "resources_note", length = 2000)
-	private String resourcesNote;
 
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)

@@ -1,7 +1,6 @@
 package com.aigp.demo.domain.plan;
 
 import com.aigp.demo.domain.enums.PlanStatus;
-import com.aigp.demo.domain.enums.PlanTriggerReason;
 import com.aigp.demo.domain.goal.Goal;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -19,10 +18,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "plan")
+@Table(name = "plans")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -30,8 +28,7 @@ public class Plan {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "plan_id")
-	private Long planId;
+	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "goal_id", nullable = false)
@@ -41,12 +38,8 @@ public class Plan {
 	private Integer version;
 
 	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 10)
+	@Column(nullable = false, length = 20)
 	private PlanStatus status;
-
-	@Enumerated(EnumType.STRING)
-	@Column(name = "trigger_reason", length = 30)
-	private PlanTriggerReason triggerReason;
 
 	@Column(name = "generated_at")
 	private LocalDateTime generatedAt;
@@ -57,8 +50,4 @@ public class Plan {
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
-
-	@UpdateTimestamp
-	@Column(name = "updated_at", nullable = false)
-	private LocalDateTime updatedAt;
 }

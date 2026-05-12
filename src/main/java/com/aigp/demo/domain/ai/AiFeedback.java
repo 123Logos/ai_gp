@@ -21,7 +21,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
-@Table(name = "ai_feedback")
+@Table(name = "ai_feedback_records")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,8 +29,7 @@ public class AiFeedback {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "feedback_id")
-	private Long feedbackId;
+	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "user_id", nullable = false)
@@ -44,13 +43,13 @@ public class AiFeedback {
 	@Column(name = "feedback_type", nullable = false, length = 30)
 	private AiFeedbackType feedbackType;
 
-	@Column(columnDefinition = "text")
-	private String summary;
+	@Column(nullable = false, columnDefinition = "text")
+	private String content;
 
-	@Column(name = "detail_json", columnDefinition = "json")
-	private String detailJson;
+	@Column(name = "is_read", nullable = false)
+	private boolean readByUser;
 
 	@CreationTimestamp
-	@Column(name = "created_at", nullable = false, updatable = false)
-	private LocalDateTime createdAt;
+	@Column(name = "generated_at", nullable = false, updatable = false)
+	private LocalDateTime generatedAt;
 }
