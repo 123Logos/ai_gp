@@ -66,8 +66,11 @@ public class Task {
 	@Column(name = "actual_minutes")
 	private Integer actualMinutes;
 
+	/**
+	 * 用户自评完成质量（1–5），与库表 {@code TINYINT UNSIGNED} 一致；未评分为 {@code null}。
+	 */
 	@Column(name = "quality_score")
-	private Integer qualityScore;
+	private Byte qualityScore;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)

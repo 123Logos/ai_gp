@@ -11,8 +11,10 @@ spring:
   jackson:
     time-zone: Asia/Shanghai
     date-format: yyyy-MM-dd HH:mm:ss
-    serialization:
-      write-dates-as-timestamps: false
+    # Jackson 3：日期是否写成时间戳由 datatype 节点配置（不再使用 serialization.write-dates-as-timestamps）
+    datatype:
+      datetime:
+        write-dates-as-timestamps: false
 
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:aigp}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
@@ -37,6 +39,15 @@ spring:
 server:
   port: ${PORT:8000}
 
+# SpringDoc：Swagger UI 与 OpenAPI JSON（标题等在 OpenApiConfig 中配置）
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
 app:
   upload-path: /data/uploads
   cors:
@@ -45,6 +56,7 @@ app:
   jwt:
     secret-key: ${JWT_SECRET_KEY:}
     access-token-expire-minutes: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:1440}
+    refresh-token-expire-days: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:30}
   admin:
     bootstrap:
       username: ${ADMIN_USERNAME:admin}
