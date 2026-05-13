@@ -11,3 +11,9 @@ spring:
     show-sql: false
   flyway:
     enabled: false
+
+# 测试用 JWT 密钥（长度满足 HS256 要求，勿用于生产）
+app:
+  jwt:
+    secret-key: "test-jwt-secret-do-not-use-in-production-32chars-min!!"
+    refresh-token-expire-days: 7

@@ -1,0 +1,85 @@
+package com.aigp.demo.web.error;
+
+import com.aigp.demo.exception.ConflictException;
+import com.aigp.demo.exception.FeatureUnavailableException;
+import com.aigp.demo.exception.NotFoundException;
+import com.aigp.demo.exception.UnauthorizedException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+/**
+ * 将领域异常与校验异常转换为统一的 JSON 错误体，避免栈信息直接暴露给客户端。
+ */
+@RestControllerAdvice
+public class ApiExceptionHandler {
+
+	/**
+	 * 资源不存在 → 404。
+	 */
+	@ExceptionHandler(NotFoundException.class)
+	public ResponseEntity<ApiErrorBody> notFound(NotFoundException ex) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(new ApiErrorBody("NOT_FOUND", ex.getMessage()));
+	}
+
+	/**
+	 * 唯一约束或业务冲突 → 409。
+	 */
+	@ExceptionHandler(ConflictException.class)
+	public ResponseEntity<ApiErrorBody> conflict(ConflictException ex) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+				.body(new ApiErrorBody("CONFLICT", ex.getMessage()));
+	}
+
+	/**
+	 * 未认证或令牌无效 → 401。
+	 */
+	@ExceptionHandler(UnauthorizedException.class)
+	public ResponseEntity<ApiErrorBody> unauthorized(UnauthorizedException ex) {
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+				.body(new ApiErrorBody("UNAUTHORIZED", ex.getMessage()));
+	}
+
+	/**
+	 * 功能暂未开放 → 503。
+	 */
+	@ExceptionHandler(FeatureUnavailableException.class)
+	public ResponseEntity<ApiErrorBody> featureDisabled(FeatureUnavailableException ex) {
+		return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+				.body(new ApiErrorBody(ex.getFeatureCode(), ex.getMessage()));
+	}
+
+	/**
+	 * Bean Validation 失败 → 400，拼接首条校验信息。
+	 */
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	public ResponseEntity<ApiErrorBody> validation(MethodArgumentNotValidException ex) {
+		String msg = ex.getBindingResult().getFieldErrors().stream()
+				.findFirst()
+				.map(err -> err.getField() + ": " + err.getDefaultMessage())
+				.orElse("请求参数不合法");
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+				.body(new ApiErrorBody("VALIDATION_ERROR", msg));
+	}
+
+	/**
+	 * 非法参数 → 400。
+	 */
+	@ExceptionHandler(IllegalArgumentException.class)
+	public ResponseEntity<ApiErrorBody> illegalArgument(IllegalArgumentException ex) {
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+				.body(new ApiErrorBody("BAD_REQUEST", ex.getMessage()));
+	}
+
+	/**
+	 * 未分类异常 → 500（生产环境可改为统一文案并打日志）。
+	 */
+	@ExceptionHandler(Exception.class)
+	public ResponseEntity<ApiErrorBody> fallback(Exception ex) {
+		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+				.body(new ApiErrorBody("INTERNAL_ERROR", ex.getMessage()));
+	}
+}

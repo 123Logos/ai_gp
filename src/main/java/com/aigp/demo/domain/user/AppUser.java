@@ -33,8 +33,11 @@ public class AppUser {
 	@Column(name = "avatar_url", length = 500)
 	private String avatarUrl;
 
+	/**
+	 * 每周可投入小时数（0–40），与库表 {@code TINYINT UNSIGNED} 一致；未设置可为 {@code null}（库默认 0）。
+	 */
 	@Column(name = "weekly_hours")
-	private Integer weeklyHours;
+	private Byte weeklyHours;
 
 	@Column(nullable = false)
 	private Byte status = 1;

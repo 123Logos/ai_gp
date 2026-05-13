@@ -17,8 +17,15 @@ public class AppProperties {
 	@Getter
 	@Setter
 	public static class Jwt {
+		/**
+		 * HS256 签名密钥（建议通过环境变量注入，长度至少 32 字节）。
+		 */
 		private String secretKey = "";
 		private long accessTokenExpireMinutes = 1440;
+		/**
+		 * 刷新令牌在数据库中的有效天数（会话 {@code user_sessions.expires_at}）。
+		 */
+		private int refreshTokenExpireDays = 30;
 	}
 
 	@Getter

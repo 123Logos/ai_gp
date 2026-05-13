@@ -1,0 +1,63 @@
+openapi: 3.0.3
+info:
+  title: AI 成长计划 — 认证与用户资料（v1 摘录）
+  version: "1.0"
+  description: |
+    与代码路径 `/api/v1/auth/**`、`/api/v1/users/me` 对齐的契约摘录。
+    完整 SpringDoc 见运行中的 `/v3/api-docs`。
+servers:
+  - url: http://localhost:8000
+paths:
+  /api/v1/auth/login:
+    post:
+      summary: 登录（暂不可用）
+      responses:
+        "503":
+          description: 功能暂未开放
+  /api/v1/auth/register:
+    post:
+      summary: 注册（暂不可用）
+      responses:
+        "503":
+          description: 功能暂未开放
+  /api/v1/auth/forgot-password:
+    post:
+      summary: 忘记密码（暂未开放）
+      responses:
+        "503":
+          description: 功能暂未开放
+  /api/v1/auth/refresh:
+    post:
+      summary: 刷新访问令牌
+      responses:
+        "200":
+          description: 新令牌对
+  /api/v1/auth/change-password:
+    post:
+      summary: 修改密码
+      security:
+        - bearerAuth: []
+  /api/v1/auth/logout:
+    post:
+      summary: 登出
+      security:
+        - bearerAuth: []
+  /api/v1/users/me:
+    get:
+      summary: 当前用户资料
+      security:
+        - bearerAuth: []
+    patch:
+      summary: 更新资料
+      security:
+        - bearerAuth: []
+    delete:
+      summary: 注销账号
+      security:
+        - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

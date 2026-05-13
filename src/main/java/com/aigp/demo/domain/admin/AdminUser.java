@@ -14,7 +14,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "admin_users")
@@ -40,8 +42,14 @@ public class AdminUser {
 	@Column(nullable = false, length = 20)
 	private AdminRole role = AdminRole.OPERATOR;
 
+	/**
+	 * 账号启用标记：与库中 {@code BIT(1)} / 布尔语义一致。
+	 * <p>
+	 * 若建表使用 {@code TINYINT(1)}（见 md文档/数据库.md），可改回 {@code Byte} 并去掉 {@code @JdbcTypeCode}。
+	 */
 	@Column(nullable = false)
-	private Byte status = 1;
+	@JdbcTypeCode(SqlTypes.BIT)
+	private Boolean status = Boolean.TRUE;
 
 	@Column(name = "last_login_at")
 	private LocalDateTime lastLoginAt;
