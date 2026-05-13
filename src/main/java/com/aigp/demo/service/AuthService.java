@@ -5,85 +5,181 @@ import com.aigp.demo.domain.user.AppUser;
 import com.aigp.demo.domain.user.IdentityType;
 import com.aigp.demo.domain.user.UserIdentity;
 import com.aigp.demo.domain.user.UserSession;
-import com.aigp.demo.exception.FeatureUnavailableException;
+import com.aigp.demo.exception.ConflictException;
 import com.aigp.demo.exception.UnauthorizedException;
+import com.aigp.demo.repository.AppUserRepository;
 import com.aigp.demo.repository.UserIdentityRepository;
 import com.aigp.demo.repository.UserSessionRepository;
 import com.aigp.demo.support.TokenHasher;
+import com.aigp.demo.support.auth.EmailOrPhoneAccount;
 import com.aigp.demo.web.security.JwtTokenService;
 import com.aigp.demo.web.security.JwtUserClaims;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 /**
- * 认证相关业务：刷新令牌、修改密码、登出，以及「暂未开放」的登录/注册/找回密码入口。
+ * 认证相关业务：登录、注册（验证码）、找回密码（验证码）、刷新令牌、修改密码、登出。
  */
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
-	public static final String CODE_LOGIN_DISABLED = "AUTH_LOGIN_DISABLED";
-	public static final String CODE_REGISTER_DISABLED = "AUTH_REGISTER_DISABLED";
-	public static final String CODE_FORGOT_PASSWORD_DISABLED = "AUTH_FORGOT_PASSWORD_DISABLED";
-
 	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+	private static final String LOGIN_FAILED_MSG = "账号或密码错误";
+
+	/**
+	 * 每用户固定一条「账号密码登录」会话槽位对应的 {@code user_sessions.device_id}，由服务端生成，不依赖客户端设备指纹，换机仍可登录与刷新。
+	 */
+	private static String syntheticSessionDeviceId(Long userId) {
+		return "builtin-" + userId;
+	}
 
 	private final AppProperties appProperties;
 	private final JwtTokenService jwtTokenService;
 	private final UserSessionRepository userSessionRepository;
 	private final UserSessionService userSessionService;
 	private final AppUserService appUserService;
+	private final AppUserRepository appUserRepository;
 	private final UserIdentityRepository userIdentityRepository;
+	private final UserIdentityService userIdentityService;
+	private final VerificationCodeService verificationCodeService;
 	private final PasswordEncoder passwordEncoder;
 
 	/**
-	 * 登录接口占位：当前产品阶段统一返回「功能不可用」。
+	 * 账号密码登录：{@code account} 支持邮箱、手机号，或 16 位对外 {@code users.uid}（以 U 开头）。仅需账号与密码，会话设备键由服务端生成。
 	 */
-	public void loginDisabled() {
-		throw new FeatureUnavailableException(CODE_LOGIN_DISABLED, "登录功能暂时不可用，请稍后再试");
+	@Transactional
+	public IssuedTokens login(String account, String password, String ipAddress) {
+		String acc = account == null ? "" : account.trim();
+		if (!StringUtils.hasText(acc) || !StringUtils.hasText(password)) {
+			throw new UnauthorizedException(LOGIN_FAILED_MSG);
+		}
+
+		Optional<UserIdentity> idRow = resolveLoginIdentity(acc);
+		UserIdentity identity =
+				idRow.orElseThrow(() -> new UnauthorizedException(LOGIN_FAILED_MSG));
+		String stored = identity.getCredential();
+		if (stored == null || !passwordEncoder.matches(password, stored)) {
+			throw new UnauthorizedException(LOGIN_FAILED_MSG);
+		}
+
+		AppUser user = appUserService.requireActive(identity.getUser().getId());
+		return issueSessionTokens(user, ipAddress);
 	}
 
 	/**
-	 * 注册接口占位：当前产品阶段统一返回「功能不可用」。
+	 * 发送注册验证码：账号须为未注册的邮箱或手机号；同一账号 60 秒内不可重复发送。
 	 */
-	public void registerDisabled() {
-		throw new FeatureUnavailableException(CODE_REGISTER_DISABLED, "注册功能暂时不可用，请稍后再试");
+	public VerificationCodeService.IssueResult sendRegisterVerificationCode(String account) {
+		EmailOrPhoneAccount norm = EmailOrPhoneAccount.parse(account);
+		if (userIdentityRepository
+				.findByIdentityTypeAndIdentifier(norm.identityType(), norm.identifier())
+				.isPresent()) {
+			throw new ConflictException("该邮箱或手机号已注册");
+		}
+		return verificationCodeService.issue(VerificationCodeService.Purpose.REGISTER, norm.identifier());
 	}
 
 	/**
-	 * 忘记密码接口占位：邮件/短信通道未接入前保持关闭。
+	 * 注册：校验验证码后创建用户、绑定密码身份并自动登录（返回令牌对）。
 	 */
-	public void forgotPasswordDisabled() {
-		throw new FeatureUnavailableException(
-				CODE_FORGOT_PASSWORD_DISABLED, "找回密码功能暂未开放，请联系客服或通过其他已绑定方式处理");
+	@Transactional
+	public IssuedTokens register(
+			String account, String password, String verificationCode, String nickname, String ipAddress) {
+		EmailOrPhoneAccount norm = EmailOrPhoneAccount.parse(account);
+		if (userIdentityRepository
+				.findByIdentityTypeAndIdentifier(norm.identityType(), norm.identifier())
+				.isPresent()) {
+			throw new ConflictException("该邮箱或手机号已注册");
+		}
+		verificationCodeService.verifyAndConsume(
+				VerificationCodeService.Purpose.REGISTER, norm.identifier(), verificationCode);
+		assertPasswordPolicy(password);
+
+		AppUser user = appUserService.registerNewUser(nickname);
+		String hash = passwordEncoder.encode(password);
+		userIdentityService.linkIdentity(
+				user, norm.identityType(), norm.identifier(), hash, true, LocalDateTime.now());
+
+		return issueSessionTokens(appUserService.requireActive(user.getId()), ipAddress);
+	}
+
+	/**
+	 * 发送找回密码验证码：账号须已注册且已设置密码。
+	 */
+	public VerificationCodeService.IssueResult sendPasswordResetVerificationCode(String account) {
+		EmailOrPhoneAccount norm = EmailOrPhoneAccount.parse(account);
+		UserIdentity id =
+				userIdentityRepository
+						.findByIdentityTypeAndIdentifier(norm.identityType(), norm.identifier())
+						.orElseThrow(() -> new IllegalArgumentException("账号不存在"));
+		if (id.getCredential() == null) {
+			throw new IllegalArgumentException("该账号未设置密码登录，无法通过此方式找回");
+		}
+		return verificationCodeService.issue(VerificationCodeService.Purpose.PASSWORD_RESET, norm.identifier());
+	}
+
+	/**
+	 * 重置密码：校验验证码后更新密码哈希，并撤销该用户全部会话（需重新登录）。
+	 */
+	@Transactional
+	public void resetPasswordWithCode(String account, String verificationCode, String newPassword) {
+		EmailOrPhoneAccount norm = EmailOrPhoneAccount.parse(account);
+		verificationCodeService.verifyAndConsume(
+				VerificationCodeService.Purpose.PASSWORD_RESET, norm.identifier(), verificationCode);
+
+		UserIdentity id =
+				userIdentityRepository
+						.findByIdentityTypeAndIdentifier(norm.identityType(), norm.identifier())
+						.orElseThrow(() -> new IllegalArgumentException("账号不存在"));
+		if (id.getCredential() == null) {
+			throw new IllegalArgumentException("该账号未设置密码登录");
+		}
+		assertPasswordPolicy(newPassword);
+		id.setCredential(passwordEncoder.encode(newPassword));
+		userIdentityRepository.save(id);
+
+		userSessionService.revokeAllForUser(id.getUser().getId());
+	}
+
+	/**
+	 * 为已认证用户创建/刷新会话并签发访问令牌与明文刷新令牌。
+	 */
+	private IssuedTokens issueSessionTokens(AppUser user, String ipAddress) {
+		String deviceId = syntheticSessionDeviceId(user.getId());
+		String refreshPlain = randomRefreshToken();
+		String refreshHash = TokenHasher.sha256Hex(refreshPlain);
+		LocalDateTime now = LocalDateTime.now();
+		LocalDateTime exp = now.plusDays(appProperties.getJwt().getRefreshTokenExpireDays());
+
+		UserSession session =
+				userSessionService.upsertSession(user, deviceId, refreshHash, exp, ipAddress, null, false);
+
+		String access = jwtTokenService.createAccessToken(user.getId(), user.getUid(), session.getId());
+		long expiresInSec = appProperties.getJwt().getAccessTokenExpireMinutes() * 60L;
+		return new IssuedTokens(access, refreshPlain, "Bearer", expiresInSec, user.getUid());
 	}
 
 	/**
 	 * 使用刷新令牌换取新的访问令牌与刷新令牌（滚动更新会话表中的哈希与过期时间）。
-	 *
-	 * @param refreshTokenPlain 客户端持有的明文刷新令牌
-	 * @param deviceId          必须与创建会话时一致，防止令牌被拷贝到其他设备滥用
-	 * @param ipAddress         可选，客户端 IP（写入会话表便于审计）
-	 * @return 新令牌对与对外 uid
 	 */
 	@Transactional
-	public IssuedTokens refresh(String refreshTokenPlain, String deviceId, String ipAddress) {
+	public IssuedTokens refresh(String refreshTokenPlain, String ipAddress) {
 		String hash = TokenHasher.sha256Hex(refreshTokenPlain);
 		LocalDateTime now = LocalDateTime.now();
 		UserSession session = userSessionRepository
 				.findActiveByRefreshTokenHash(hash, now)
 				.orElseThrow(() -> new UnauthorizedException("刷新令牌无效或已过期"));
-
-		if (!deviceId.equals(session.getDeviceId())) {
-			throw new UnauthorizedException("设备标识与刷新令牌不匹配");
-		}
 
 		AppUser user = appUserService.requireActive(session.getUser().getId());
 
@@ -103,10 +199,6 @@ public class AuthService {
 
 	/**
 	 * 校验原密码后更新哈希；默认保留当前会话，撤销该用户其他设备的刷新会话。
-	 *
-	 * @param claims      当前访问令牌声明（用于识别要保留的会话 id）
-	 * @param oldPassword 原密码
-	 * @param newPassword 新密码
 	 */
 	@Transactional
 	public void changePassword(JwtUserClaims claims, String oldPassword, String newPassword) {
@@ -138,7 +230,6 @@ public class AuthService {
 		if (sid != null) {
 			userSessionService.revokeSession(claims.userId(), sid);
 		} else {
-			// 旧版令牌未携带 sid 时，退化为撤销全部，避免留下「无法定位」的活跃会话
 			userSessionService.revokeAllForUser(claims.userId());
 		}
 	}
@@ -157,6 +248,27 @@ public class AuthService {
 		}
 	}
 
+	private Optional<UserIdentity> resolveLoginIdentity(String acc) {
+		if (acc.contains("@")) {
+			return userIdentityRepository
+					.findByIdentityTypeAndIdentifier(IdentityType.email, acc.toLowerCase(Locale.ROOT))
+					.filter(id -> id.getCredential() != null);
+		}
+		if (looksLikePublicUid(acc)) {
+			String uidKey = acc.toUpperCase(Locale.ROOT);
+			return appUserRepository
+					.findByUid(uidKey)
+					.flatMap(u -> findPasswordIdentity(u.getId()));
+		}
+		return userIdentityRepository
+				.findByIdentityTypeAndIdentifier(IdentityType.phone, acc)
+				.filter(id -> id.getCredential() != null);
+	}
+
+	private static boolean looksLikePublicUid(String acc) {
+		return acc.length() == 16 && (acc.charAt(0) == 'U' || acc.charAt(0) == 'u');
+	}
+
 	private Optional<UserIdentity> findPasswordIdentity(Long userId) {
 		Optional<UserIdentity> email = userIdentityRepository.findByUser_IdAndIdentityType(userId, IdentityType.email);
 		if (email.isPresent() && email.get().getCredential() != null) {
@@ -171,7 +283,7 @@ public class AuthService {
 
 	private static void assertPasswordPolicy(String newPassword) {
 		if (newPassword == null || newPassword.length() < 8) {
-			throw new IllegalArgumentException("新密码长度至少 8 位");
+			throw new IllegalArgumentException("密码长度至少 8 位");
 		}
 	}
 
@@ -183,12 +295,6 @@ public class AuthService {
 
 	/**
 	 * 登录成功或刷新后返回给前端的令牌载体。
-	 *
-	 * @param accessToken        访问令牌 JWT
-	 * @param refreshToken       明文刷新令牌（仅客户端保存，库中存哈希）
-	 * @param tokenType          固定为 Bearer
-	 * @param expiresInSeconds   访问令牌剩余有效秒数
-	 * @param uid                对外用户标识
 	 */
 	public record IssuedTokens(
 			String accessToken, String refreshToken, String tokenType, long expiresInSeconds, String uid) {}

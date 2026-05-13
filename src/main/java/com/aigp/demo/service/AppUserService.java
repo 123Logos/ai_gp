@@ -46,13 +46,18 @@ public class AppUserService {
 	 * {@code md文档/数据库.md}.
 	 */
 	@Transactional
-	public AppUser registerNewUser() {
+	public AppUser registerNewUser(String nickname) {
 		AppUser user = new AppUser();
 		user.setUid(UidGenerator.nextUid());
 		user.setStatus((byte) 1);
 		user.setTimezone("Asia/Shanghai");
 		user.setLanguage("zh-CN");
 		user.setWeeklyHours((byte) 0);
+		if (org.springframework.util.StringUtils.hasText(nickname)) {
+			user.setNickname(nickname.trim());
+		} else {
+			user.setNickname("新用户");
+		}
 		appUserRepository.save(user);
 		userNotificationSettingsService.getOrCreate(user);
 		return user;

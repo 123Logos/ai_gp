@@ -5,6 +5,7 @@ import com.aigp.demo.domain.user.IdentityType;
 import com.aigp.demo.domain.user.UserIdentity;
 import com.aigp.demo.exception.ConflictException;
 import com.aigp.demo.repository.UserIdentityRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -23,12 +24,16 @@ public class UserIdentityService {
 	}
 
 	/**
-	 * Binds a login identity to a user. Enforces {@code uk_identity (identity_type, identifier)}.
-	 * When {@code primary} is true, clears primary flag on other identities of the same user.
+	 * 绑定或更新身份；{@code verifiedAt} 非空时写入验证完成时间（注册验码通过后使用）。
 	 */
 	@Transactional
 	public UserIdentity linkIdentity(
-			AppUser user, IdentityType identityType, String identifier, String credential, boolean primary) {
+			AppUser user,
+			IdentityType identityType,
+			String identifier,
+			String credential,
+			boolean primary,
+			LocalDateTime verifiedAt) {
 		Optional<UserIdentity> existing =
 				userIdentityRepository.findByIdentityTypeAndIdentifier(identityType, identifier);
 		if (existing.isPresent()) {
@@ -38,6 +43,9 @@ public class UserIdentityService {
 			}
 			if (credential != null) {
 				row.setCredential(credential);
+			}
+			if (verifiedAt != null) {
+				row.setVerifiedAt(verifiedAt);
 			}
 			if (primary) {
 				clearPrimaryForUser(user.getId());
@@ -54,6 +62,7 @@ public class UserIdentityService {
 		row.setIdentifier(identifier);
 		row.setCredential(credential);
 		row.setPrimary(primary);
+		row.setVerifiedAt(verifiedAt);
 		return userIdentityRepository.save(row);
 	}
 

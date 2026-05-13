@@ -20,6 +20,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 @NoArgsConstructor
 public class AppUser {
 
+	/**
+	 * 内部主键，由数据库自增生成（非 Java 手写）。
+	 * 生产库建议自增起点为 {@code 100000000}，见 {@code md文档/数据库.md} 建表语句或 {@code scripts/mysql-users-autoincrement.sql}。
+	 */
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
