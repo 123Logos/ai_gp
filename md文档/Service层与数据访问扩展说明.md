@@ -127,7 +127,7 @@
 |:---|:---|
 | `AppUser requireById(Long id)` | 按主键查用户；不存在则抛 `NotFoundException`。只读事务。 |
 | `AppUser requireByUid(String uid)` | 按对外 `uid` 查用户；不存在则抛 `NotFoundException`。只读事务。 |
-| `AppUser registerNewUser()` | **注册最小用户**：生成 `uid`、默认 `status=1`、`timezone`、`language`、`weekly_hours=0` 并保存；再调用通知设置服务的 `getOrCreate` 保证存在 **`user_notification_settings`** 一行（与数据库文档一对一关系一致）。写事务。 |
+| `AppUser registerNewUser(String nickname)` | **注册最小用户**：生成 `uid`、默认 `status=1`、`timezone`、`language`、`weekly_hours=0`；若 `nickname` 有内容则写入昵称，否则昵称默认为「新用户」；保存后再调用通知设置服务的 `getOrCreate` 保证存在 **`user_notification_settings`** 一行。写事务。 |
 | `AppUser updateProfile(Long userId, String nickname, String avatarUrl, Integer weeklyHours)` | 按 `userId` 加载用户后，对非 `null` 的 `nickname`、`avatarUrl`、`weeklyHours` 做更新；`weeklyHours` 须在 **0–40**，否则 `IllegalArgumentException`。写事务。 |
 
 ---
@@ -150,7 +150,7 @@
 | 函数 | 作用 |
 |:---|:---|
 | `Optional<UserIdentity> find(IdentityType identityType, String identifier)` | 按认证类型 + 标识符查询一条身份（如微信 openid）。只读事务。 |
-| `UserIdentity linkIdentity(AppUser user, IdentityType identityType, String identifier, String credential, boolean primary)` | **绑定或更新身份**：若 `(identity_type, identifier)` 已存在且属于**其他用户**，抛 `ConflictException`；若已属于**当前用户**，可更新 `credential`、在 `primary==true` 时把该条设为主并清除同用户其他条目的主标记；若不存在则插入新行。主身份互斥通过 `clearPrimaryForUser` 实现。写事务。 |
+| `UserIdentity linkIdentity(AppUser user, IdentityType identityType, String identifier, String credential, boolean primary, LocalDateTime verifiedAt)` | **绑定或更新身份**：若 `(identity_type, identifier)` 已存在且属于**其他用户**，抛 `ConflictException`；若已属于**当前用户**，可更新 `credential`、`verified_at`、在 `primary==true` 时把该条设为主并清除同用户其他条目的主标记；若不存在则插入新行。主身份互斥通过 `clearPrimaryForUser` 实现。写事务。 |
 | `private void clearPrimaryForUser(Long userId)` | 将该用户下所有 `UserIdentity` 的 `is_primary` 置为 `false`，为即将设置的主身份腾位。 |
 
 ---
@@ -161,7 +161,7 @@
 
 | 函数 | 作用 |
 |:---|:---|
-| `UserSession upsertSession(AppUser user, String deviceId, String refreshToken, LocalDateTime expiresAt, String platform, String deviceName, String ipAddress, String accessTokenJti, boolean trusted)` | 按 `(user_id, device_id)` **查找或新建**会话行，写入刷新令牌、过期时间、设备信息、JTI、信任标记，并将 `revoked_at` 置空（表示重新有效）。写事务。 |
+| `UserSession upsertSession(AppUser user, String deviceId, String refreshToken, LocalDateTime expiresAt, String ipAddress, String accessTokenJti, boolean trusted)` | 按 `(user_id, device_id)` **查找或新建**会话行，写入刷新令牌、过期时间、IP、JTI、信任标记，并将 `revoked_at` 置空（表示重新有效）。写事务。 |
 | `void revokeSession(Long userId, Long sessionId)` | 按 `sessionId` 加载会话，且会话必须属于 `userId`；否则 `NotFoundException`。将 `revoked_at` 设为当前时间（软撤销）。写事务。 |
 
 ---

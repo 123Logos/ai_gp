@@ -2,11 +2,13 @@ package com.aigp.demo.web.auth;
 
 import com.aigp.demo.service.AuthService;
 import com.aigp.demo.web.auth.dto.ChangePasswordRequest;
-import com.aigp.demo.web.auth.dto.ForgotPasswordRequest;
 import com.aigp.demo.web.auth.dto.LoginRequest;
 import com.aigp.demo.web.auth.dto.LogoutRequest;
+import com.aigp.demo.web.auth.dto.PasswordResetRequest;
 import com.aigp.demo.web.auth.dto.RefreshTokenRequest;
 import com.aigp.demo.web.auth.dto.RegisterRequest;
+import com.aigp.demo.web.auth.dto.SendVerificationCodeRequest;
+import com.aigp.demo.web.auth.dto.SendVerificationCodeResponse;
 import com.aigp.demo.web.auth.dto.TokenResponse;
 import com.aigp.demo.web.security.CurrentUser;
 import com.aigp.demo.web.security.JwtUserClaims;
@@ -16,6 +18,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,7 +28,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 认证相关 HTTP 接口：登录/注册/找回密码占位、刷新令牌、修改密码、登出。
+ * 认证相关 HTTP 接口：登录、注册（验证码）、找回密码（验证码）、刷新令牌、修改密码、登出。
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -36,30 +40,56 @@ public class AuthController {
 	private final AuthService authService;
 
 	/**
-	 * [登录] 当前产品阶段固定返回 503，占位供前端联调路径与契约。
+	 * [登录] 邮箱、手机号或 16 位对外 uid（U 开头）+ 密码，成功返回令牌对（会话由服务端绑定内置设备键，换机不影响）。
 	 */
 	@PostMapping("/login")
-	@Operation(summary = "登录（暂不可用）")
-	public void login(@Valid @RequestBody LoginRequest request) {
-		authService.loginDisabled();
+	@Operation(summary = "登录")
+	public TokenResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+		var issued = authService.login(request.account(), request.password(), clientIp(httpRequest));
+		return TokenResponse.from(issued);
 	}
 
 	/**
-	 * [注册] 当前产品阶段固定返回 503。
+	 * [注册-发码] 向账号发送验证码（当前为内存实现，生产需接短信/邮件）。
+	 */
+	@PostMapping("/register/send-code")
+	@Operation(summary = "注册：发送验证码")
+	public SendVerificationCodeResponse sendRegisterCode(@Valid @RequestBody SendVerificationCodeRequest request) {
+		return SendVerificationCodeResponse.from(authService.sendRegisterVerificationCode(request.account()));
+	}
+
+	/**
+	 * [注册] 验证码 + 密码 + 昵称等，成功后自动登录并返回令牌对。
 	 */
 	@PostMapping("/register")
-	@Operation(summary = "注册（暂不可用）")
-	public void register(@Valid @RequestBody RegisterRequest request) {
-		authService.registerDisabled();
+	@Operation(summary = "注册")
+	public TokenResponse register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
+		var issued = authService.register(
+				request.account(),
+				request.password(),
+				request.verificationCode(),
+				request.nickname(),
+				clientIp(httpRequest));
+		return TokenResponse.from(issued);
 	}
 
 	/**
-	 * [忘记密码] 当前产品阶段固定返回 503（邮件/短信通道未接入）。
+	 * [找回密码-发码] 向已注册账号发送验证码。
 	 */
-	@PostMapping("/forgot-password")
-	@Operation(summary = "忘记密码（暂未开放）")
-	public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-		authService.forgotPasswordDisabled();
+	@PostMapping("/password/reset/send-code")
+	@Operation(summary = "找回密码：发送验证码")
+	public SendVerificationCodeResponse sendPasswordResetCode(@Valid @RequestBody SendVerificationCodeRequest request) {
+		return SendVerificationCodeResponse.from(authService.sendPasswordResetVerificationCode(request.account()));
+	}
+
+	/**
+	 * [找回密码] 验证码 + 新密码；成功后撤销全部会话。
+	 */
+	@PostMapping("/password/reset")
+	@Operation(summary = "找回密码：重置密码")
+	public ResponseEntity<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+		authService.resetPasswordWithCode(request.account(), request.verificationCode(), request.newPassword());
+		return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 	}
 
 	/**
@@ -68,12 +98,7 @@ public class AuthController {
 	@PostMapping("/refresh")
 	@Operation(summary = "刷新访问令牌")
 	public TokenResponse refresh(@Valid @RequestBody RefreshTokenRequest body, HttpServletRequest request) {
-		var issued = authService.refresh(
-				body.refreshToken(),
-				body.deviceId(),
-				body.platform(),
-				body.deviceName(),
-				clientIp(request));
+		var issued = authService.refresh(body.refreshToken(), clientIp(request));
 		return TokenResponse.from(issued);
 	}
 
@@ -99,9 +124,6 @@ public class AuthController {
 		authService.logout(user, all);
 	}
 
-	/**
-	 * 从代理头或直连连接中解析客户端 IP（用于写入会话表审计字段）。
-	 */
 	private static String clientIp(HttpServletRequest request) {
 		String xff = request.getHeader("X-Forwarded-For");
 		if (StringUtils.hasText(xff)) {

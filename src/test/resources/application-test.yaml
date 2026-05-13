@@ -9,6 +9,12 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: false
+    # Hibernate 建表后再执行 data.sql，使 users.id 从 100000000 起递增
+    defer-datasource-initialization: true
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data.sql
   flyway:
     enabled: false
 
@@ -17,3 +23,6 @@ app:
   jwt:
     secret-key: "test-jwt-secret-do-not-use-in-production-32chars-min!!"
     refresh-token-expire-days: 7
+  auth:
+    # 单元测试发码接口可回显验证码，便于自动化（勿用于生产）
+    verification-debug-return-code: true

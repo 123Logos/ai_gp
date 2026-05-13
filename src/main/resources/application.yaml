@@ -36,6 +36,7 @@ spring:
   flyway:
     enabled: false
 
+# 用户主键 users.id 建议从 100000000 起：新建库见 md文档/数据库.md 建表语句；已有库执行 scripts/mysql-users-autoincrement.sql
 server:
   port: ${PORT:8000}
 
@@ -57,6 +58,11 @@ app:
     secret-key: ${JWT_SECRET_KEY:}
     access-token-expire-minutes: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:1440}
     refresh-token-expire-days: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:30}
+  auth:
+    # 验证码有效秒数（注册、找回密码共用）
+    verification-ttl-seconds: ${APP_AUTH_VERIFICATION_TTL_SECONDS:300}
+    # 仅开发联调：发码接口是否在 JSON 中回显验证码（生产务必 false）
+    verification-debug-return-code: ${APP_AUTH_VERIFICATION_DEBUG_RETURN_CODE:false}
   admin:
     bootstrap:
       username: ${ADMIN_USERNAME:admin}
