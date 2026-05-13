@@ -70,14 +70,11 @@ public class AuthService {
 	 *
 	 * @param refreshTokenPlain 客户端持有的明文刷新令牌
 	 * @param deviceId          必须与创建会话时一致，防止令牌被拷贝到其他设备滥用
-	 * @param platform          可选，如 ios/android/web
-	 * @param deviceName        可选，设备展示名
-	 * @param ipAddress         可选，客户端 IP
+	 * @param ipAddress         可选，客户端 IP（写入会话表便于审计）
 	 * @return 新令牌对与对外 uid
 	 */
 	@Transactional
-	public IssuedTokens refresh(
-			String refreshTokenPlain, String deviceId, String platform, String deviceName, String ipAddress) {
+	public IssuedTokens refresh(String refreshTokenPlain, String deviceId, String ipAddress) {
 		String hash = TokenHasher.sha256Hex(refreshTokenPlain);
 		LocalDateTime now = LocalDateTime.now();
 		UserSession session = userSessionRepository
@@ -96,8 +93,6 @@ public class AuthService {
 
 		session.setRefreshToken(newRefreshHash);
 		session.setExpiresAt(exp);
-		session.setPlatform(platform);
-		session.setDeviceName(deviceName);
 		session.setIpAddress(ipAddress);
 		userSessionRepository.save(session);
 

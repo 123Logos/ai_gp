@@ -161,7 +161,7 @@
 
 | 函数 | 作用 |
 |:---|:---|
-| `UserSession upsertSession(AppUser user, String deviceId, String refreshToken, LocalDateTime expiresAt, String platform, String deviceName, String ipAddress, String accessTokenJti, boolean trusted)` | 按 `(user_id, device_id)` **查找或新建**会话行，写入刷新令牌、过期时间、设备信息、JTI、信任标记，并将 `revoked_at` 置空（表示重新有效）。写事务。 |
+| `UserSession upsertSession(AppUser user, String deviceId, String refreshToken, LocalDateTime expiresAt, String ipAddress, String accessTokenJti, boolean trusted)` | 按 `(user_id, device_id)` **查找或新建**会话行，写入刷新令牌、过期时间、IP、JTI、信任标记，并将 `revoked_at` 置空（表示重新有效）。写事务。 |
 | `void revokeSession(Long userId, Long sessionId)` | 按 `sessionId` 加载会话，且会话必须属于 `userId`；否则 `NotFoundException`。将 `revoked_at` 设为当前时间（软撤销）。写事务。 |
 
 ---

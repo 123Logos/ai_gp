@@ -68,12 +68,7 @@ public class AuthController {
 	@PostMapping("/refresh")
 	@Operation(summary = "刷新访问令牌")
 	public TokenResponse refresh(@Valid @RequestBody RefreshTokenRequest body, HttpServletRequest request) {
-		var issued = authService.refresh(
-				body.refreshToken(),
-				body.deviceId(),
-				body.platform(),
-				body.deviceName(),
-				clientIp(request));
+		var issued = authService.refresh(body.refreshToken(), body.deviceId(), clientIp(request));
 		return TokenResponse.from(issued);
 	}
 

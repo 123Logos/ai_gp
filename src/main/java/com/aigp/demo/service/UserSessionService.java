@@ -16,15 +16,13 @@ public class UserSessionService {
 
 	private final UserSessionRepository userSessionRepository;
 
-	/** Creates or updates a row for {@code (user_id, device_id)} per {@code md文档/数据库.md}. */
+	/** 按 {@code (user_id, device_id)} 查找或新建会话行，写入刷新令牌、过期时间、IP、JTI、信任标记，并将 {@code revoked_at} 置空。 */
 	@Transactional
 	public UserSession upsertSession(
 			AppUser user,
 			String deviceId,
 			String refreshToken,
 			LocalDateTime expiresAt,
-			String platform,
-			String deviceName,
 			String ipAddress,
 			String accessTokenJti,
 			boolean trusted) {
@@ -34,8 +32,6 @@ public class UserSessionService {
 		session.setDeviceId(deviceId);
 		session.setRefreshToken(refreshToken);
 		session.setExpiresAt(expiresAt);
-		session.setPlatform(platform);
-		session.setDeviceName(deviceName);
 		session.setIpAddress(ipAddress);
 		session.setAccessTokenJti(accessTokenJti);
 		session.setTrusted(trusted);

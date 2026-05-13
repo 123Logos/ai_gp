@@ -10,6 +10,4 @@ import jakarta.validation.constraints.NotBlank;
 public record LoginRequest(
 		@Schema(description = "邮箱或手机号") @NotBlank String account,
 		@Schema(description = "密码") @NotBlank String password,
-		@Schema(description = "客户端设备唯一标识，与会话表 device_id 对应") @NotBlank String deviceId,
-		@Schema(description = "平台：ios / android / web") String platform,
-		@Schema(description = "设备展示名称") String deviceName) {}
+		@Schema(description = "客户端设备唯一标识，与会话表 device_id 对应") @NotBlank String deviceId) {}
