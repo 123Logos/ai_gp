@@ -7,6 +7,7 @@ import com.aigp.demo.web.auth.dto.LogoutRequest;
 import com.aigp.demo.web.auth.dto.PasswordResetRequest;
 import com.aigp.demo.web.auth.dto.RefreshTokenRequest;
 import com.aigp.demo.web.auth.dto.RegisterRequest;
+import com.aigp.demo.web.auth.dto.SendRegisterVerificationCodeRequest;
 import com.aigp.demo.web.auth.dto.SendVerificationCodeRequest;
 import com.aigp.demo.web.auth.dto.SendVerificationCodeResponse;
 import com.aigp.demo.web.auth.dto.TokenResponse;
@@ -50,22 +51,23 @@ public class AuthController {
 	}
 
 	/**
-	 * [注册-发码] 向账号发送验证码（当前为内存实现，生产需接短信/邮件）。
+	 * [注册-发码] 向未注册邮箱发送验证码（配置 SMTP 时走邮件，否则内存 + 可选 debugCode）。
 	 */
 	@PostMapping("/register/send-code")
-	@Operation(summary = "注册：发送验证码")
-	public SendVerificationCodeResponse sendRegisterCode(@Valid @RequestBody SendVerificationCodeRequest request) {
-		return SendVerificationCodeResponse.from(authService.sendRegisterVerificationCode(request.account()));
+	@Operation(summary = "注册：发送邮箱验证码")
+	public SendVerificationCodeResponse sendRegisterCode(
+			@Valid @RequestBody SendRegisterVerificationCodeRequest request) {
+		return SendVerificationCodeResponse.from(authService.sendRegisterVerificationCode(request.email()));
 	}
 
 	/**
-	 * [注册] 验证码 + 密码 + 昵称等，成功后自动登录并返回令牌对。
+	 * [注册] 邮箱 + 密码 + 昵称 + 邮箱验证码，成功后自动登录并返回令牌对。
 	 */
 	@PostMapping("/register")
 	@Operation(summary = "注册")
 	public TokenResponse register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
 		var issued = authService.register(
-				request.account(),
+				request.email(),
 				request.password(),
 				request.verificationCode(),
 				request.nickname(),

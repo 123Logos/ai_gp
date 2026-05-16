@@ -2,18 +2,52 @@
 # 建表：在 MySQL 中执行 md文档/数据库.md 中的 DDL。
 
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/ai_gp?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
-    username: root
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:ai_gp}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${MYSQL_USER:root}
     password: your_password_here
 
   jpa:
     show-sql: true
     hibernate:
       ddl-auto: validate
+
+  # QQ 邮箱：网页版 → 设置 → 账户 → 开启 SMTP → 生成「授权码」填到 password（不是 QQ 登录密码）
+  mail:
+    host: smtp.qq.com
+    port: 465
+    username: your_qq_number@qq.com
+    password: your_smtp_auth_code_here
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+
+# AI 对话：MiMo 百亿 Token 计划 Key；本地调试可改 default-provider 为 ollama
+app:
+  jwt:
+    # 优先 .env 中的 JWT_SECRET_KEY；未设置时用下方占位（仅本地，≥32 字符）
+    secret-key: ${JWT_SECRET_KEY:local-dev-jwt-secret-do-not-use-in-production!!}
+  auth:
+    verification-debug-return-code: ${APP_AUTH_VERIFICATION_DEBUG_RETURN_CODE:true}
+  chat:
+    pipeline-debug-log-enabled: ${AI_CHAT_PIPELINE_DEBUG_LOG:true}
+    pipeline-debug-log-file: ${AI_CHAT_PIPELINE_DEBUG_LOG_FILE:logs/ai-chat-pipeline.txt}
+    default-provider: mimo
+    providers:
+      mimo:
+        api-key: your_mimo_api_key_here
+        base-url: https://api.xiaomimimo.com/v1
+        model: mimo-v2-flash
+      ollama:
+        api-key: ""
+        base-url: http://localhost:11434/v1
+        model: qwen2.5
 
 logging:
   level:

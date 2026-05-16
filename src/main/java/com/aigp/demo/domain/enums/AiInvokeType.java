@@ -4,5 +4,6 @@ public enum AiInvokeType {
 	DECOMPOSE,
 	SCHEDULE,
 	FEEDBACK,
+	CHAT,
 	OTHER
 }

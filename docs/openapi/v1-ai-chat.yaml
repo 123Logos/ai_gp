@@ -1,0 +1,379 @@
+openapi: 3.0.3
+info:
+  title: AI 成长计划 API — AI 对话与通知
+  description: |
+    AI 智能对话、助手任务查询、站内通知及 WebSocket 推送约定。
+    鉴权方式：Bearer JWT（`bearerAuth`）。
+    人类可读说明见仓库 `md文档/HTTP接口-AI对话与通知.md`、`md文档/AI对话与助手任务-流程说明.md`。
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: 本地开发
+
+tags:
+  - name: AI 对话
+    description: 智能对话与会话消息
+  - name: 助手任务
+    description: 用户助手待办（非成长计划 tasks）
+  - name: 站内通知
+    description: 任务提醒等通知
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/ai/chat:
+    post:
+      tags: [AI 对话]
+      summary: 发送对话消息
+      description: |
+        用户发一轮消息；服务端可选执行数据规划与意图分析，调用大模型及任务工具，
+        将本轮用户消息与助手最终回复落库，并可通过 WebSocket 推送 CHAT_REPLY。
+      operationId: postAiChat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiChatRequest'
+            example:
+              message: 帮我记一下周五前要交周报
+              sessionId: 12
+              provider: mimo
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiChatResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: AI 提供商未配置（FEATURE_UNAVAILABLE）
+
+  /api/v1/ai/chat/sessions/{sessionId}/messages:
+    get:
+      tags: [AI 对话]
+      summary: 拉取会话历史消息
+      description: 按时间升序返回已落库的 USER/ASSISTANT 消息；含「任务提醒」会话。
+      operationId: listAiChatMessages
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiChatMessageListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/users/me/tasks:
+    get:
+      tags: [助手任务]
+      summary: 查询当前用户的助手任务清单
+      operationId: listMyAssistantTasks
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [OPEN, DONE, CANCELLED]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAssistantTaskListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/users/me/notifications/unread-count:
+    get:
+      tags: [站内通知]
+      summary: 未读通知数量
+      operationId: getNotificationUnreadCount
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadCountResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/users/me/notifications:
+    get:
+      tags: [站内通知]
+      summary: 通知列表
+      operationId: listNotifications
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InAppNotificationListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/users/me/notifications/{id}/read:
+    patch:
+      tags: [站内通知]
+      summary: 标记单条通知已读
+      operationId: markNotificationRead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: 已标记
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/users/me/notifications/read-all:
+    patch:
+      tags: [站内通知]
+      summary: 全部标记已读
+      operationId: markAllNotificationsRead
+      responses:
+        '204':
+          description: 已全部标记
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 登录或注册返回的 accessToken
+
+  schemas:
+    AiChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          maxLength: 8000
+          description: 用户本轮输入
+        sessionId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 继续已有会话；不传则新建
+        provider:
+          type: string
+          description: mimo（默认）或 ollama
+
+    AiChatResponse:
+      type: object
+      properties:
+        reply:
+          type: string
+        sessionId:
+          type: integer
+          format: int64
+        provider:
+          type: string
+        model:
+          type: string
+        userMessageId:
+          type: integer
+          format: int64
+        assistantMessageId:
+          type: integer
+          format: int64
+
+    AiChatMessageItemResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        role:
+          type: string
+          enum: [USER, ASSISTANT]
+        content:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AiChatMessageListResponse:
+      type: object
+      properties:
+        sessionId:
+          type: integer
+          format: int64
+        sessionTitle:
+          type: string
+          nullable: true
+        count:
+          type: integer
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/AiChatMessageItemResponse'
+
+    UserAssistantTaskItemResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [OPEN, DONE, CANCELLED]
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+        reminderSentAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserAssistantTaskListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserAssistantTaskItemResponse'
+
+    UnreadCountResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int64
+
+    InAppNotificationItemResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+          example: TASK_DUE_REMINDER
+        title:
+          type: string
+        body:
+          type: string
+        taskId:
+          type: integer
+          format: int64
+          nullable: true
+        sessionId:
+          type: integer
+          format: int64
+          nullable: true
+        messageId:
+          type: integer
+          format: int64
+          nullable: true
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    InAppNotificationListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InAppNotificationItemResponse'
+
+    ErrorBody:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: 未登录或令牌无效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          example:
+            code: UNAUTHORIZED
+            message: 未授权
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          example:
+            code: NOT_FOUND
+            message: 对话会话不存在
+    ValidationError:
+      description: 请求体验证失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          example:
+            code: VALIDATION_ERROR
+            message: message 不能为空
+
+# WebSocket（非 OpenAPI 标准 path，仅作文档补充）
+# ws://{host}/ws/v1/chat?token={accessToken}
+# 推送 type: CHAT_REPLY | TASK_DUE_REMINDER，字段见 md文档/HTTP接口-AI对话与通知.md 第 5 章

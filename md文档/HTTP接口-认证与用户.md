@@ -69,11 +69,11 @@
 
 | 步骤 | 接口 | 发送（请求体） | 成功时得到（响应体） |
 |------|------|----------------|----------------------|
-| **A1 发验证码** | `POST /api/v1/auth/register/send-code` | `{ "account": "<邮箱或11位手机号>" }` | `{ "expiresInSeconds": <秒>, "debugCode": "<仅开发配置开启时有>" }` |
-| **A2 提交注册** | `POST /api/v1/auth/register` | `{ "account": "<与A1相同>", "password": "<至少8位>", "verificationCode": "<6位>", "nickname": "<可选，最长50>" }` | 与登录相同结构的 **令牌包**（见下表「令牌包」） |
+| **A1 发验证码** | `POST /api/v1/auth/register/send-code` | `{ "email": "<未注册邮箱>" }` | `{ "expiresInSeconds": <秒>, "debugCode": "<仅开发配置开启时有>" }` |
+| **A2 提交注册** | `POST /api/v1/auth/register` | `{ "email": "<与A1相同>", "password": "<至少8位>", "nickname": "<必填，最长50>", "verificationCode": "<6位邮箱验证码>" }` | 与登录相同结构的 **令牌包**（见下表「令牌包」） |
 
-- **A1 说明**：`account` 须为 **未注册** 的邮箱或大陆手机号；同一账号 **60 秒内** 只能发一次码。生产环境一般 **没有** `debugCode`；本地可把 `app.auth.verification-debug-return-code` 设为 `true` 便于联调。
-- **A2 说明**：`nickname` 可不传或传空，服务端会默认昵称「新用户」。成功后 **自动登录**，直接拿到令牌，一般无需再调登录接口。
+- **A1 说明**：仅支持 **邮箱**；`email` 须为 **未注册**；同一邮箱 **60 秒内** 只能发一次码。配置 `spring.mail` 时验证码走 **邮件**（见 `md文档/QQ邮箱SMTP与验证码.md`），否则为进程内内存。生产环境一般 **没有** `debugCode`；本地可把 `app.auth.verification-debug-return-code` 设为 `true` 便于联调。
+- **A2 说明**：须与 A1 使用同一邮箱；**昵称必填**。手机号等请在登录后通过 **PATCH `/api/v1/users/me`** 绑定（见第 3 章）。成功后 **自动登录**，直接拿到令牌。
 
 ---
 
@@ -130,12 +130,12 @@
 
 - **方法 / 路径**：`POST /api/v1/auth/register/send-code`
 - **鉴权**：不需要
-- **说明**：向未注册的邮箱或 **11 位中国大陆手机号** 下发验证码（当前实现为 **进程内内存**，重启即失效；生产需接短信/邮件网关）。同一账号 **60 秒内** 不可重复发送。
+- **说明**：向 **未注册邮箱** 发注册验证码（仅邮箱；配置 SMTP 时走邮件，否则内存 + 可选 `debugCode`）。同一邮箱 **60 秒内** 不可重复发送。SMTP 配置见 `md文档/QQ邮箱SMTP与验证码.md`。
 - **请求体**（JSON）：
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| account | string | 是 | 邮箱或 11 位手机号 |
+| email | string | 是 | 有效邮箱，与后续注册请求一致（服务端存小写） |
 
 - **200 响应体**（JSON）：
 
@@ -144,7 +144,8 @@
 | expiresInSeconds | number | 验证码有效秒数（与 `app.auth.verification-ttl-seconds` 一致） |
 | debugCode | string \| null | 仅当 `app.auth.verification-debug-return-code=true` 时返回明文验证码，便于本地联调；**生产必须为 false** |
 
-- **409**：该邮箱或手机号已注册。
+- **409**：该邮箱已注册。
+- **503**：已配置 SMTP 但邮件发送失败（如授权码错误、网络问题）；错误码 `SERVICE_UNAVAILABLE`，本次发码已回滚，可稍后重试。
 
 ---
 
@@ -152,19 +153,19 @@
 
 - **方法 / 路径**：`POST /api/v1/auth/register`
 - **鉴权**：不需要
-- **说明**：校验验证码（一次性）后创建 `users`、绑定 `user_identities` 密码身份、写入默认通知设置，并 **自动登录** 返回令牌对。账号格式与发码阶段须一致（邮箱小写存库）。
+- **说明**：校验 **邮箱** 验证码（一次性）后创建 `users`、绑定 **邮箱+密码** 身份、写入默认通知设置，并 **自动登录** 返回令牌对。邮箱与发码阶段须一致（小写存库）。**手机号请在登录后 PATCH 资料绑定。**
 - **请求体**（JSON）：
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| account | string | 是 | 与发码时相同的邮箱或手机号 |
+| email | string | 是 | 与发码时相同的邮箱 |
 | password | string | 是 | 登录密码，至少 8 位 |
-| verificationCode | string | 是 | 收到的 6 位数字验证码 |
-| nickname | string | 否 | 昵称，最长 50；不传或空则昵称默认为「新用户」 |
+| nickname | string | 是 | 昵称，最长 50 |
+| verificationCode | string | 是 | 邮箱收到的 6 位数字验证码 |
 
 - **200 响应体**：同 **2.6** `TokenResponse`。
 - **401**：验证码错误、过期等。
-- **409**：账号已注册。
+- **409**：该邮箱已注册。
 
 ---
 
@@ -172,10 +173,11 @@
 
 - **方法 / 路径**：`POST /api/v1/auth/password/reset/send-code`
 - **鉴权**：不需要
-- **说明**：向 **已注册且已设置密码** 的邮箱或手机号发码；频控同 2.2。
+- **说明**：向 **已注册且已设置密码** 的邮箱或手机号发码；频控同 2.2。邮箱在已配置 SMTP 时发邮件，否则内存验证码。
 - **请求体**：同 2.2（`{ "account": "..." }`）。
 - **200 响应体**：同 2.2（`expiresInSeconds`、`debugCode`）。
 - **400**：账号不存在、未设置密码登录等。
+- **503**：同 2.2（SMTP 发送失败时）。
 
 ---
 
@@ -274,6 +276,11 @@
 | status | number | 1 正常 / 2 禁用 / 3 注销 |
 | createdAt | string | 注册时间（ISO 风格日期时间，见全局 Jackson 配置） |
 | updatedAt | string | 最近更新时间 |
+| phone | string \| null | 已绑定手机号（脱敏，如 `138****8000`）；未绑定为 `null` |
+| identitySummary | string \| null | 身份/角色简述 |
+| hobbies | string \| null | 爱好 |
+| explorationInterests | string \| null | 希望探索的专业方向等 |
+| onboardingCompleted | boolean | 是否已完成首次画像填写 |
 
 ---
 
@@ -287,12 +294,31 @@
 | nickname | string | 最长 50 | 昵称 |
 | avatarUrl | string | 最长 500 | 头像 |
 | weeklyHours | number | 0–40 | 每周可投入小时数 |
+| phone | string | 11 位大陆号 `1[3-9]…` | 绑定到当前用户；**无短信验证、不写密码**，仅作资料展示与后续扩展；与库中其他用户冲突时 **409** |
 
 - **200**：同 3.1 响应结构。
 
 ---
 
-### 3.3 注销当前账号（软删除）
+### 3.3 更新首次登录用户画像（身份、爱好、探索方向）
+
+- **方法 / 路径**：`PATCH /api/v1/users/me/onboarding`
+- **说明**：用于注册后首次进入产品时的问卷/画像；**部分更新**：请求体里未出现的字段保持原值。传 **空字符串** `""` 可清空对应文本字段；`onboardingCompleted` 未传则不改。
+- **请求体**（JSON）：
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| identitySummary | string | 最长 200 | 身份或角色简述，如学生、产品经理 |
+| hobbies | string | 最长 4000 | 爱好 |
+| explorationInterests | string | 最长 4000 | 希望探索的专业方向、领域等 |
+| onboardingCompleted | boolean | — | 是否标记为已完成首次画像；`true` / `false` |
+
+- **200**：同 3.1 响应结构。
+- **400**：字段超长等校验错误。
+
+---
+
+### 3.4 注销当前账号（软删除）
 
 - **方法 / 路径**：`DELETE /api/v1/users/me`
 - **说明**：将用户状态置为 **3（注销）**，并撤销 **全部** 会话。
@@ -302,9 +328,11 @@
 
 ## 4. 配置与安全（部署备忘）
 
+**本地与生产如何分别配置 JWT、数据库等**：见 **`md文档/环境与密钥配置.md`**。
+
 | 配置项 | 说明 |
 |--------|------|
-| `JWT_SECRET_KEY` / `app.jwt.secret-key` | HS256 密钥，**至少 32 字节**；过短或未配置时，受保护接口可能返回配置类错误。 |
+| `JWT_SECRET_KEY` / `app.jwt.secret-key` | HS256 密钥，**至少 32 字节**；注册/登录签发令牌必填；生产仅环境变量、与本地密钥必须不同。 |
 | `app.jwt.access-token-expire-minutes` | 访问令牌有效分钟数。 |
 | `app.jwt.refresh-token-expire-days` | 刷新令牌对应会话过期天数。 |
 | `app.auth.verification-ttl-seconds` | 注册/找回密码验证码有效秒数（默认 300）。 |
@@ -318,6 +346,16 @@
 
 ---
 
-## 6. 文档维护
+## 6. 相关文档
+
+| 文档 | 说明 |
+|------|------|
+| `md文档/环境与密钥配置.md` | JWT、.env、dev/prod 配置分层 |
+| `md文档/HTTP接口-AI对话与通知.md` | AI 对话、助手任务、站内通知、WebSocket |
+| `md文档/AI对话与助手任务-流程说明.md` | 对话与提醒业务流程（非接口字段） |
+
+---
+
+## 7. 文档维护
 
 接口变更时，请同步更新 **本文件**（`md文档/HTTP接口-认证与用户.md`），保持与控制器代码一致。

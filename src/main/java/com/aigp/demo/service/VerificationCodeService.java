@@ -2,18 +2,21 @@ package com.aigp.demo.service;
 
 import com.aigp.demo.config.AppProperties;
 import com.aigp.demo.exception.UnauthorizedException;
+import com.aigp.demo.support.mail.VerificationEmailSender;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 /**
- * 进程内验证码存储（注册 / 找回密码），用于在未接入短信网关前的联调与演示。
+ * 验证码生成与进程内校验；若配置了 SMTP，则向邮箱账号发送同一验证码邮件。
  * <p>
- * 生产环境应替换为真实短信或邮件发送与中心化存储（Redis 等），并关闭 {@code app.auth.verification-debug-return-code}。
+ * 手机号仍为内存验证码；生产环境建议中心化存储（Redis 等）并关闭 {@code app.auth.verification-debug-return-code}。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VerificationCodeService {
@@ -35,9 +38,10 @@ public class VerificationCodeService {
 	private static final long SEND_INTERVAL_MS = 60_000L;
 
 	private final AppProperties appProperties;
+	private final VerificationEmailSender verificationEmailSender;
 
 	/**
-	 * 生成并保存验证码，返回有效秒数及（可选）调试明文。
+	 * 生成并保存验证码，返回有效秒数及（可选）调试明文；邮箱账号且已配置 SMTP 时发送邮件。
 	 */
 	public IssueResult issue(Purpose purpose, String identifier) {
 		String key = storageKey(purpose, identifier);
@@ -51,6 +55,20 @@ public class VerificationCodeService {
 		Instant exp = Instant.now().plusSeconds(ttl);
 		STORE.put(key, new Holder(code, exp));
 		LAST_SEND_MS.put(key, now);
+		try {
+			if (identifier.contains("@")) {
+				if (verificationEmailSender.isMailConfigured()) {
+					verificationEmailSender.sendVerificationCode(identifier, purpose, code, ttl);
+				} else {
+					log.warn(
+							"账号为邮箱但未配置 spring.mail（SMTP），验证码仅在服务端内存有效；生产环境请配置 QQ 邮箱等，见 md文档/QQ邮箱SMTP与验证码.md");
+				}
+			}
+		} catch (RuntimeException e) {
+			STORE.remove(key);
+			LAST_SEND_MS.remove(key);
+			throw e;
+		}
 		String debug = appProperties.getAuth().isVerificationDebugReturnCode() ? code : null;
 		return new IssueResult(ttl, debug);
 	}

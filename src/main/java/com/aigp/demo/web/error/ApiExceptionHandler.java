@@ -74,6 +74,12 @@ public class ApiExceptionHandler {
 				.body(new ApiErrorBody("BAD_REQUEST", ex.getMessage()));
 	}
 
+	@ExceptionHandler(IllegalStateException.class)
+	public ResponseEntity<ApiErrorBody> illegalState(IllegalStateException ex) {
+		return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+				.body(new ApiErrorBody("SERVICE_UNAVAILABLE", ex.getMessage()));
+	}
+
 	/**
 	 * 未分类异常 → 500（生产环境可改为统一文案并打日志）。
 	 */

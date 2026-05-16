@@ -78,38 +78,34 @@ public class AuthService {
 	}
 
 	/**
-	 * 发送注册验证码：账号须为未注册的邮箱或手机号；同一账号 60 秒内不可重复发送。
+	 * 发送注册验证码：仅支持邮箱；须未注册；同一邮箱 60 秒内不可重复发送。
 	 */
-	public VerificationCodeService.IssueResult sendRegisterVerificationCode(String account) {
-		EmailOrPhoneAccount norm = EmailOrPhoneAccount.parse(account);
-		if (userIdentityRepository
-				.findByIdentityTypeAndIdentifier(norm.identityType(), norm.identifier())
-				.isPresent()) {
-			throw new ConflictException("该邮箱或手机号已注册");
+	public VerificationCodeService.IssueResult sendRegisterVerificationCode(String email) {
+		String norm = EmailOrPhoneAccount.requireEmailIdentifier(email);
+		if (userIdentityRepository.findByIdentityTypeAndIdentifier(IdentityType.email, norm).isPresent()) {
+			throw new ConflictException("该邮箱已注册");
 		}
-		return verificationCodeService.issue(VerificationCodeService.Purpose.REGISTER, norm.identifier());
+		return verificationCodeService.issue(VerificationCodeService.Purpose.REGISTER, norm);
 	}
 
 	/**
-	 * 注册：校验验证码后创建用户、绑定密码身份并自动登录（返回令牌对）。
+	 * 注册：仅邮箱 + 密码 + 昵称 + 邮箱验证码；校验通过后创建用户、绑定邮箱密码身份并自动登录。
 	 */
 	@Transactional
 	public IssuedTokens register(
-			String account, String password, String verificationCode, String nickname, String ipAddress) {
-		EmailOrPhoneAccount norm = EmailOrPhoneAccount.parse(account);
-		if (userIdentityRepository
-				.findByIdentityTypeAndIdentifier(norm.identityType(), norm.identifier())
-				.isPresent()) {
-			throw new ConflictException("该邮箱或手机号已注册");
+			String email, String password, String verificationCode, String nickname, String ipAddress) {
+		String norm = EmailOrPhoneAccount.requireEmailIdentifier(email);
+		if (userIdentityRepository.findByIdentityTypeAndIdentifier(IdentityType.email, norm).isPresent()) {
+			throw new ConflictException("该邮箱已注册");
 		}
 		verificationCodeService.verifyAndConsume(
-				VerificationCodeService.Purpose.REGISTER, norm.identifier(), verificationCode);
+				VerificationCodeService.Purpose.REGISTER, norm, verificationCode);
 		assertPasswordPolicy(password);
 
-		AppUser user = appUserService.registerNewUser(nickname);
+		AppUser user = appUserService.registerNewUser(nickname.strip());
 		String hash = passwordEncoder.encode(password);
 		userIdentityService.linkIdentity(
-				user, norm.identityType(), norm.identifier(), hash, true, LocalDateTime.now());
+				user, IdentityType.email, norm, hash, true, LocalDateTime.now());
 
 		return issueSessionTokens(appUserService.requireActive(user.getId()), ipAddress);
 	}

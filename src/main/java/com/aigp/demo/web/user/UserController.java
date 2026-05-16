@@ -1,9 +1,12 @@
 package com.aigp.demo.web.user;
 
 import com.aigp.demo.service.AppUserService;
+import com.aigp.demo.service.UserAssistantTaskService;
 import com.aigp.demo.web.security.CurrentUser;
 import com.aigp.demo.web.security.JwtUserClaims;
+import com.aigp.demo.web.user.dto.PatchOnboardingRequest;
 import com.aigp.demo.web.user.dto.UpdateProfileRequest;
+import com.aigp.demo.web.user.dto.UserAssistantTaskListResponse;
 import com.aigp.demo.web.user.dto.UserProfileResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -32,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
 	private final AppUserService appUserService;
+	private final UserAssistantTaskService userAssistantTaskService;
 
 	/**
 	 * [当前用户] 返回基本画像字段（需有效访问令牌且账号状态为正常）。
@@ -40,18 +45,39 @@ public class UserController {
 	@Operation(summary = "获取当前用户资料")
 	public UserProfileResponse me(@CurrentUser JwtUserClaims user) {
 		var u = appUserService.requireActive(user.userId());
-		return UserProfileResponse.fromEntity(u);
+		return appUserService.toProfileResponse(u);
 	}
 
 	/**
-	 * [更新资料] 部分更新昵称、头像与每周可投入小时数。
+	 * [更新资料] 部分更新昵称、头像、每周可投入小时数，以及可选绑定大陆手机号（无短信校验，见接口文档）。
 	 */
 	@PatchMapping("/me")
 	@Operation(summary = "更新当前用户资料")
 	public UserProfileResponse patchMe(@CurrentUser JwtUserClaims user, @Valid @RequestBody UpdateProfileRequest body) {
-		var updated =
-				appUserService.updateProfile(user.userId(), body.nickname(), body.avatarUrl(), body.weeklyHours());
-		return UserProfileResponse.fromEntity(updated);
+		var updated = appUserService.updateProfile(
+				user.userId(), body.nickname(), body.avatarUrl(), body.weeklyHours(), body.phone());
+		return appUserService.toProfileResponse(updated);
+	}
+
+	@GetMapping("/me/tasks")
+	@Operation(summary = "查询当前用户的助手任务清单")
+	public UserAssistantTaskListResponse listMyTasks(
+			@CurrentUser JwtUserClaims user,
+			@RequestParam(required = false) String status) {
+		return userAssistantTaskService.listTasksForUser(user.userId(), status);
+	}
+
+	@PatchMapping("/me/onboarding")
+	@Operation(summary = "更新首次登录用户画像（身份、爱好、探索方向等）")
+	public UserProfileResponse patchOnboarding(
+			@CurrentUser JwtUserClaims user, @Valid @RequestBody PatchOnboardingRequest body) {
+		var updated = appUserService.updateOnboardingProfile(
+				user.userId(),
+				body.identitySummary(),
+				body.hobbies(),
+				body.explorationInterests(),
+				body.onboardingCompleted());
+		return appUserService.toProfileResponse(updated);
 	}
 
 	/**

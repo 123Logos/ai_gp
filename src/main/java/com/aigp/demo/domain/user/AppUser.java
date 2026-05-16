@@ -52,6 +52,21 @@ public class AppUser {
 	@Column(nullable = false, length = 10)
 	private String language = "zh-CN";
 
+	/** 身份 / 角色简述（首次登录了解用户用） */
+	@Column(name = "profile_identity", length = 200)
+	private String profileIdentity;
+
+	/** 爱好（自由文本，可逗号或换行分隔） */
+	@Column(name = "profile_hobbies", columnDefinition = "TEXT")
+	private String profileHobbies;
+
+	/** 希望探索的专业方向等 */
+	@Column(name = "profile_exploration", columnDefinition = "TEXT")
+	private String profileExploration;
+
+	@Column(name = "onboarding_completed", nullable = false)
+	private Boolean onboardingCompleted = Boolean.FALSE;
+
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;

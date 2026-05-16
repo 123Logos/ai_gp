@@ -1,0 +1,113 @@
+package com.aigp.demo.support.llm;
+
+import com.aigp.demo.config.AppProperties;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+
+@Component
+@RequiredArgsConstructor
+public class OpenAiCompatibleChatClient {
+
+	private final ObjectMapper objectMapper;
+	private final AiChatPipelineDebugLog pipelineDebugLog;
+
+	public ChatCompletionResult chat(
+			AppProperties.ChatProvider provider, List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
+		return chat(provider, messages, tools, "llm");
+	}
+
+	/**
+	 * @param debugPhase 调试日志阶段名（如 plan / intent / execute-r1），仅 pipeline-debug 开启时输出
+	 */
+	public ChatCompletionResult chat(
+			AppProperties.ChatProvider provider,
+			List<Map<String, Object>> messages,
+			List<Map<String, Object>> tools,
+			String debugPhase) {
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("model", provider.getModel());
+		body.put("messages", messages);
+		if (tools != null && !tools.isEmpty()) {
+			body.put("tools", tools);
+			body.put("tool_choice", "auto");
+		}
+
+		RestClient.Builder builder =
+				RestClient.builder().baseUrl(normalizeBaseUrl(provider.getBaseUrl()));
+		if (StringUtils.hasText(provider.getApiKey())) {
+			builder.defaultHeader("Authorization", "Bearer " + provider.getApiKey().trim());
+		}
+		RestClient client = builder.build();
+
+		String phase = debugPhase == null ? "llm" : debugPhase;
+		pipelineDebugLog.llmRequest(phase, provider.getModel(), messages, tools);
+
+		try {
+			String responseJson = client
+					.post()
+					.uri("/chat/completions")
+					.contentType(MediaType.APPLICATION_JSON)
+					.body(body)
+					.retrieve()
+					.body(String.class);
+			ChatCompletionResult result = parseResponse(responseJson);
+			pipelineDebugLog.llmResponse(phase, result, responseJson);
+			return result;
+		} catch (RestClientResponseException ex) {
+			String detail = ex.getResponseBodyAsString();
+			if (detail != null && detail.length() > 500) {
+				detail = detail.substring(0, 500);
+			}
+			pipelineDebugLog.step(phase, "LLM 调用失败 status=%s body=%s", ex.getStatusCode(), detail);
+			throw new IllegalStateException("模型接口调用失败: " + ex.getStatusCode() + " " + detail, ex);
+		}
+	}
+
+	private ChatCompletionResult parseResponse(String responseJson) {
+		try {
+			JsonNode root = objectMapper.readTree(responseJson);
+			JsonNode message = root.path("choices").path(0).path("message");
+			String content = message.path("content").isNull() ? null : message.path("content").asText();
+			JsonNode rcNode = message.path("reasoning_content");
+			String reasoningContent = null;
+			if (!rcNode.isMissingNode() && !rcNode.isNull()) {
+				reasoningContent = rcNode.isTextual() ? rcNode.asText() : rcNode.toString();
+			}
+			List<ChatCompletionResult.ToolCallPayload> toolCalls = new ArrayList<>();
+			JsonNode toolCallsNode = message.path("tool_calls");
+			if (toolCallsNode.isArray()) {
+				for (JsonNode tc : toolCallsNode) {
+					String id = tc.path("id").asText();
+					JsonNode fn = tc.path("function");
+					toolCalls.add(new ChatCompletionResult.ToolCallPayload(
+							id, fn.path("name").asText(), fn.path("arguments").asText("")));
+				}
+			}
+			JsonNode usage = root.path("usage");
+			Integer promptTokens = usage.path("prompt_tokens").isMissingNode() ? null : usage.path("prompt_tokens").asInt();
+			Integer completionTokens =
+					usage.path("completion_tokens").isMissingNode() ? null : usage.path("completion_tokens").asInt();
+			return new ChatCompletionResult(content, reasoningContent, toolCalls, promptTokens, completionTokens);
+		} catch (Exception e) {
+			throw new IllegalStateException("解析模型响应失败", e);
+		}
+	}
+
+	private static String normalizeBaseUrl(String baseUrl) {
+		String u = baseUrl == null ? "" : baseUrl.trim();
+		while (u.endsWith("/")) {
+			u = u.substring(0, u.length() - 1);
+		}
+		return u;
+	}
+}

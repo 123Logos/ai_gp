@@ -4,8 +4,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
 /**
- * 请求发送短信/邮件验证码（当前为内存验证码，生产需接网关）。
+ * 找回密码等场景：邮箱或手机号发码（注册发码请使用 {@link SendRegisterVerificationCodeRequest}）。
  */
-@Schema(description = "发送验证码请求")
+@Schema(description = "发送验证码请求（找回密码等）")
 public record SendVerificationCodeRequest(
 		@Schema(description = "邮箱或 11 位中国大陆手机号") @NotBlank String account) {}

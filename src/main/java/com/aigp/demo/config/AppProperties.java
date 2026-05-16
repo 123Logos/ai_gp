@@ -1,5 +1,7 @@
 package com.aigp.demo.config;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -14,6 +16,15 @@ public class AppProperties {
 	private final Admin admin = new Admin();
 	private final Llm llm = new Llm();
 	private final Vlm vlm = new Vlm();
+	private final Chat chat = new Chat();
+	private final TaskReminder taskReminder = new TaskReminder();
+
+	/** 本地上传根目录（相对路径基于进程工作目录） */
+	private String uploadPath = "uploads";
+	/** 对外访问根 URL，用于生成图片链接（如 http://localhost:8000） */
+	private String publicBaseUrl = "http://localhost:8000";
+	/** 单张图片最大字节数，默认 5MB */
+	private long maxImageUploadBytes = 5L * 1024 * 1024;
 
 	@Getter
 	@Setter
@@ -70,5 +81,52 @@ public class AppProperties {
 		private String apiKey = "";
 		private String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 		private String model = "qwen-vl-max-latest";
+	}
+
+	/**
+	 * AI 对话：OpenAI 兼容接口，支持多提供商（如小米 MiMo、本地 Ollama）。
+	 */
+	@Getter
+	@Setter
+	public static class Chat {
+		/** 默认提供商键名：mimo / ollama */
+		private String defaultProvider = "mimo";
+		/** 带入模型的最近消息条数（不含 system） */
+		private int maxHistoryMessages = 24;
+		/** 单轮对话内工具调用最大轮次 */
+		private int maxToolRounds = 5;
+		/** 是否启用「先规划数据 → 意图分析 → 执行」多阶段（中间过程不落库） */
+		private boolean multiPhaseEnabled = true;
+		/** 规划阶段带入的最近对话条数（仅 USER/ASSISTANT 文本摘要） */
+		private int planningHistorySnippetMessages = 6;
+		/** 对话回复完成后是否 WebSocket 推送 CHAT_REPLY（用户在线时） */
+		private boolean pushOnReplyEnabled = true;
+		/** 为 true 时输出 AI 对话中间过程调试记录（规划/模型/工具）；生产务必 false */
+		private boolean pipelineDebugLogEnabled = false;
+		/** 中间过程追加写入的 txt 路径（相对路径基于进程工作目录，如 logs/ai-chat-pipeline.txt） */
+		private String pipelineDebugLogFile = "logs/ai-chat-pipeline.txt";
+		private Map<String, ChatProvider> providers = new LinkedHashMap<>();
+	}
+
+	@Getter
+	@Setter
+	public static class ChatProvider {
+		private String apiKey = "";
+		private String baseUrl = "";
+		private String model = "";
+	}
+
+	/** 助手任务（user_assistant_tasks）到期提醒：站内会话 + 通知 + WebSocket */
+	@Getter
+	@Setter
+	public static class TaskReminder {
+		private boolean enabled = true;
+		/** 写入「任务提醒」会话并生成站内通知 */
+		private boolean inAppEnabled = true;
+		/** 站内通知创建后 WebSocket 推送给在线用户 */
+		private boolean pushEnabled = true;
+		/** 每日触发 cron，默认每天 8:00 */
+		private String cron = "0 0 8 * * ?";
+		private String zone = "Asia/Shanghai";
 	}
 }
