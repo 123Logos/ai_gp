@@ -1,5 +1,6 @@
 HELP.md
 .env
+logs/
 application-local.yml
 target/
 .mvn/wrapper/maven-wrapper.jar
@@ -33,6 +34,7 @@ build/
 
 ### Cursor ###
 .cursor/skills/ultra-dev-flow/SKILL.md
+.cursor/rules/ultra-dev-flow.mdc
 
 ### VS Code ###
 .vscode/

@@ -292,4 +292,23 @@ TaskService.complete | skip
 
 ---
 
+## 8. AI 对话与助手任务（补充，2026-05-16）
+
+完整业务流程见 **`md文档/AI对话与助手任务-流程说明.md`**；HTTP 见 **`md文档/HTTP接口-AI对话与通知.md`**。
+
+| 类 | 职责摘要 |
+|:---|:---|
+| `AiChatService` | 对话主编排：规划 → 上下文 → 多轮工具 → 落库 → 推送 |
+| `AiChatPlanningService` | 数据规划 JSON、意图分析（`multi-phase-enabled`） |
+| `AiChatUserContextBuilder` | 组装 system 提示（画像 + 任务摘要） |
+| `AiChatToolExecutor` | 执行 `list_tasks` / `create_task` 等工具 |
+| `UserAssistantTaskService` | 助手任务 CRUD 与对话用 JSON 摘要 |
+| `AiChatReminderSessionService` | 「任务提醒」固定会话与写入助手消息 |
+| `AssistantTaskReminderService` | 到期扫描、站内通知与提醒正文 |
+| `AssistantTaskReminderScheduler` | 定时触发提醒 |
+| `InAppNotificationService` | 通知 CRUD、WebSocket 载荷组装 |
+| `ChatRealtimePushService` | 按 userId 维护 WebSocket 连接并推送 |
+
+---
+
 *文档版本：与仓库中 Service / Repository 扩展代码同步整理。*

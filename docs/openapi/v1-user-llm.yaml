@@ -1,0 +1,76 @@
+openapi: 3.0.3
+info:
+  title: AI GP - 用户 LLM 配置 API
+  version: 1.0.0
+
+paths:
+  /api/v1/users/me/llm/settings:
+    get:
+      tags: [用户 LLM 配置]
+      summary: 获取 LLM 调用配置
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 配置（不含完整 apiKey）
+    put:
+      tags: [用户 LLM 配置]
+      summary: 保存 LLM 配置（PLATFORM / BYOK）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [billingMode, provider]
+              properties:
+                billingMode:
+                  type: string
+                  enum: [PLATFORM, BYOK]
+                provider:
+                  type: string
+                apiKey:
+                  type: string
+                  maxLength: 512
+                baseUrl:
+                  type: string
+                  maxLength: 500
+                model:
+                  type: string
+                  maxLength: 128
+      responses:
+        "200":
+          description: 保存后的配置
+        "400":
+          description: |
+            参数非法、BYOK 缺 Key、或连通性探测失败（apiKey/baseUrl/model 不可用）。
+            示例：`{"code":"BAD_REQUEST","message":"模型名称不可用或不存在，请核对 model（当前：deepseek-v4-flash）"}`
+        "503":
+          description: PLATFORM 模式下平台未配置 Key（如 MIMO_API_KEY 缺失）
+    delete:
+      tags: [用户 LLM 配置]
+      summary: 恢复平台代调
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 恢复后的配置
+
+  /api/v1/users/me/llm/providers:
+    get:
+      tags: [用户 LLM 配置]
+      summary: 列出可选 AI 提供商
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 提供商列表（不含密钥）
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

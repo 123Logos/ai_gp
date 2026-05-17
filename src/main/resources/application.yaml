@@ -36,6 +36,19 @@ spring:
   flyway:
     enabled: false
 
+  # 可选：配置后，向「含 @ 的邮箱账号」发注册/找回密码验证码邮件（QQ 见 application-dev.yaml.example、md文档/QQ邮箱SMTP与验证码.md）
+  mail:
+    host: smtp.qq.com
+    port: 465
+    username: 3817473890@qq.com
+    password: nsrgagvtjevicfid
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+
 # 用户主键 users.id 建议从 100000000 起：新建库见 md文档/数据库.md 建表语句；已有库执行 scripts/mysql-users-autoincrement.sql
 server:
   port: ${PORT:8000}
@@ -50,11 +63,14 @@ springdoc:
     operations-sorter: alpha
 
 app:
-  upload-path: /data/uploads
+  upload-path: ${APP_UPLOAD_PATH:uploads}
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8000}
+  max-image-upload-bytes: ${APP_MAX_IMAGE_UPLOAD_BYTES:5242880}
   cors:
     allowed-origins: "*"
     allowed-methods: GET,POST,PUT,DELETE,OPTIONS
   jwt:
+    # 默认无密钥：dev 见 application-dev.yaml / .env；prod 见 application-prod.yaml（仅环境变量）
     secret-key: ${JWT_SECRET_KEY:}
     access-token-expire-minutes: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:1440}
     refresh-token-expire-days: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:30}
@@ -75,3 +91,59 @@ app:
     api-key: ${VLM_API_KEY:}
     base-url: ${VLM_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
     model: ${VLM_MODEL:qwen-vl-max-latest}
+  # AI 对话（OpenAI 兼容）：默认 mimo，可切换 ollama；任务 CRUD 由后端工具实现
+  chat:
+    default-provider: ${AI_CHAT_DEFAULT_PROVIDER:mimo}
+    max-history-messages: ${AI_CHAT_MAX_HISTORY:24}
+    max-tool-rounds: ${AI_CHAT_MAX_TOOL_ROUNDS:5}
+    multi-phase-enabled: ${AI_CHAT_MULTI_PHASE_ENABLED:true}
+    fast-path-enabled: ${AI_CHAT_FAST_PATH_ENABLED:true}
+    planning-history-snippet-messages: ${AI_CHAT_PLANNING_HISTORY_SNIPPET:6}
+    push-on-reply-enabled: ${AI_CHAT_PUSH_ON_REPLY:true}
+    # 保存 PUT /users/me/llm/settings 时探测 apiKey/baseUrl/model 是否可用
+    validate-llm-settings-on-save: ${AI_CHAT_VALIDATE_LLM_SETTINGS_ON_SAVE:true}
+    # 为 true 时将中间过程追加写入 txt（仅调试，生产务必 false）
+    pipeline-debug-log-enabled: ${AI_CHAT_PIPELINE_DEBUG_LOG:false}
+    pipeline-debug-log-file: ${AI_CHAT_PIPELINE_DEBUG_LOG_FILE:logs/ai-chat-pipeline.txt}
+    providers:
+      mimo:
+        # Token Plan 请用 OpenAI 兼容地址 /v1（不要用 /anthropic）；Key 建议环境变量 MIMO_API_KEY
+        api-key: ${MIMO_API_KEY:tp-c86l7wklhw8r1vb3nrax1drdijyeyznojsxugglxkhukc41e}
+        base-url: ${MIMO_BASE_URL:https://token-plan-cn.xiaomimimo.com/v1}
+        model: ${MIMO_MODEL:mimo-v2.5-pro}
+      ollama:
+        api-key: ${OLLAMA_API_KEY:}
+        base-url: ${OLLAMA_BASE_URL:http://localhost:11434/v1}
+        model: ${OLLAMA_MODEL:qwen2.5}
+  # 助手任务到期提醒：站内「任务提醒」会话 + 通知 + WebSocket（不发任务邮件）
+  task-reminder:
+    enabled: ${APP_TASK_REMINDER_ENABLED:true}
+    in-app-enabled: ${APP_TASK_REMINDER_IN_APP:true}
+    push-enabled: ${APP_TASK_REMINDER_PUSH:true}
+    cron: ${APP_TASK_REMINDER_CRON:0 * * * * ?}
+    zone: ${APP_TASK_REMINDER_ZONE:Asia/Shanghai}
+    # 任务只有 due_date、没有 due_at 时，在截止日当天该时刻提醒（用户本地）
+    default-due-date-reminder-time: ${APP_TASK_REMINDER_DEFAULT_TIME:08:00}
+  # 陪伴记忆：周六 03:00 总结，周六 08:00（用户本地）与任务提醒一并推送本周回顾
+  companion-memory:
+    enabled: ${APP_COMPANION_MEMORY_ENABLED:true}
+    summarize-cron: ${APP_COMPANION_MEMORY_SUMMARIZE_CRON:0 0 3 ? * SAT}
+    zone: ${APP_COMPANION_MEMORY_ZONE:Asia/Shanghai}
+    digest-delivery-time: ${APP_COMPANION_MEMORY_DIGEST_TIME:08:00}
+    digest-in-app-enabled: ${APP_COMPANION_MEMORY_DIGEST_IN_APP:true}
+    digest-push-enabled: ${APP_COMPANION_MEMORY_DIGEST_PUSH:true}
+    max-messages-per-week: ${APP_COMPANION_MEMORY_MAX_MSG_PER_WEEK:200}
+    max-memory-chars: ${APP_COMPANION_MEMORY_MAX_CHARS:12000}
+  # 语音转写：前端 multipart → Java → 内网 STT（见 md文档/本地语音转写-STT部署.md）
+  speech:
+    enabled: ${APP_SPEECH_ENABLED:true}
+    base-url: ${APP_SPEECH_BASE_URL:http://127.0.0.1:9000}
+    transcribe-path: ${APP_SPEECH_TRANSCRIBE_PATH:/asr}
+    upstream-file-part-name: ${APP_SPEECH_UPSTREAM_FILE_PART:audio_file}
+    query-language: ${APP_SPEECH_QUERY_LANGUAGE:zh}
+    query-output: ${APP_SPEECH_QUERY_OUTPUT:json}
+    query-encode: ${APP_SPEECH_QUERY_ENCODE:true}
+    query-task: ${APP_SPEECH_QUERY_TASK:transcribe}
+    max-audio-bytes: ${APP_SPEECH_MAX_BYTES:10485760}
+    connect-timeout-ms: ${APP_SPEECH_CONNECT_TIMEOUT_MS:5000}
+    read-timeout-ms: ${APP_SPEECH_READ_TIMEOUT_MS:120000}

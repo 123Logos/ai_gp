@@ -12,4 +12,6 @@ import jakarta.validation.constraints.Size;
 public record UpdateProfileRequest(
 		@Schema(description = "昵称") @Size(max = 50) String nickname,
 		@Schema(description = "头像 URL") @Size(max = 500) String avatarUrl,
-		@Schema(description = "每周可投入小时数 0–40") @Min(0) @Max(40) Integer weeklyHours) {}
+		@Schema(description = "每周可投入小时数 0–40") @Min(0) @Max(40) Integer weeklyHours,
+		@Schema(description = "大陆 11 位手机号，绑定到当前账号（无密码，不用于手机密码登录；未传或 null 表示不修改）")
+				String phone) {}

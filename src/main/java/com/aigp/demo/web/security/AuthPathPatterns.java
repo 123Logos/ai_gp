@@ -17,7 +17,8 @@ public final class AuthPathPatterns {
 		"/api/v1/auth/register/send-code",
 		"/api/v1/auth/password/reset",
 		"/api/v1/auth/password/reset/send-code",
-		"/api/v1/auth/refresh"
+		"/api/v1/auth/refresh",
+		"/api/v1/public/avatars/**"
 	};
 
 	private static final AntPathMatcher MATCHER = new AntPathMatcher();

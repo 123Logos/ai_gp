@@ -1,0 +1,239 @@
+openapi: 3.0.3
+info:
+  title: AI GP - 用户资料与头像 API
+  version: 1.0.0
+  description: |
+    当前用户资料、**头像上传**与公开读取。
+    人类可读说明（含 curl / fetch 示例）见 `md文档/HTTP接口-认证与用户.md` 第 3.2.1、3.2.2 节。
+
+servers:
+  - url: http://localhost:8000
+    description: 本地开发（端口以 application.yaml 为准）
+
+tags:
+  - name: 用户资料
+    description: 需 Bearer JWT
+  - name: 公开头像
+    description: 无需登录
+
+paths:
+  /api/v1/users/me:
+    get:
+      tags: [用户资料]
+      summary: 获取当前用户资料
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 用户资料
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+    patch:
+      tags: [用户资料]
+      summary: 更新当前用户资料（JSON 部分更新）
+      description: 本地上传头像请使用 POST /api/v1/users/me/avatar，不要在本接口传文件。
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: 更新后的用户资料
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+
+  /api/v1/users/me/avatar:
+    post:
+      tags: [用户资料]
+      summary: 上传头像并自动更新 avatarUrl
+      description: |
+        multipart 表单字段名必须为 **file**。
+        成功后将 avatarUrl 设为 `{publicBaseUrl}/api/v1/public/avatars/{uid}`，可直接用于 img 标签。
+        支持 image/jpeg、image/png、image/webp、image/gif；默认最大 5MB。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 头像图片文件
+      responses:
+        "200":
+          description: 上传成功，avatarUrl 已更新为公开地址
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+              example:
+                uid: U0123456789ABCDE
+                nickname: 小明
+                avatarUrl: http://localhost:8000/api/v1/public/avatars/U0123456789ABCDE
+                weeklyHours: 10
+                timezone: Asia/Shanghai
+                language: zh-CN
+                status: 1
+                onboardingCompleted: false
+        "400":
+          description: 未选文件、MIME 不在白名单或超过大小上限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              examples:
+                empty:
+                  value:
+                    code: BAD_REQUEST
+                    message: 请选择图片文件
+                type:
+                  value:
+                    code: BAD_REQUEST
+                    message: 仅支持 JPEG、PNG、WebP、GIF 图片
+                size:
+                  value:
+                    code: BAD_REQUEST
+                    message: 图片过大，单张不超过 5MB
+        "401":
+          description: 未登录或 Token 无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /api/v1/public/avatars/{uid}:
+    get:
+      tags: [公开头像]
+      summary: 按 uid 读取头像（无需登录）
+      description: 供前端 img src 直接引用；与 UserProfileResponse.avatarUrl 路径一致。
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          description: 16 位对外用户标识（U + 15 位十六进制）
+          schema:
+            type: string
+            example: U0123456789ABCDE
+      responses:
+        "200":
+          description: 图片二进制
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: 用户不存在、账号非正常或尚未上传头像
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                code: NOT_FOUND
+                message: 头像不存在
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Authorization: Bearer {accessToken}"
+
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+          example: BAD_REQUEST
+        message:
+          type: string
+          example: 仅支持 JPEG、PNG、WebP、GIF 图片
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        nickname:
+          type: string
+          maxLength: 50
+        avatarUrl:
+          type: string
+          maxLength: 500
+          description: 外链头像 URL；本地上传请用 POST /me/avatar
+        weeklyHours:
+          type: integer
+          minimum: 0
+          maximum: 40
+        phone:
+          type: string
+          description: 大陆 11 位手机号
+
+    UserProfileResponse:
+      type: object
+      properties:
+        uid:
+          type: string
+          description: 对外用户 id
+        nickname:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+          description: 上传头像后为公开 GET /api/v1/public/avatars/{uid} 完整 URL
+        weeklyHours:
+          type: integer
+          nullable: true
+        timezone:
+          type: string
+        language:
+          type: string
+        status:
+          type: integer
+          description: 1 正常 2 禁用 3 注销
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        phone:
+          type: string
+          nullable: true
+          description: 脱敏手机号
+        identitySummary:
+          type: string
+          nullable: true
+        hobbies:
+          type: string
+          nullable: true
+        explorationInterests:
+          type: string
+          nullable: true
+        onboardingCompleted:
+          type: boolean

@@ -39,7 +39,7 @@ public class UserIdentityService {
 		if (existing.isPresent()) {
 			UserIdentity row = existing.get();
 			if (!row.getUser().getId().equals(user.getId())) {
-				throw new ConflictException("Identity already bound to another user");
+				throw new ConflictException("该认证标识已被其他账号绑定");
 			}
 			if (credential != null) {
 				row.setCredential(credential);

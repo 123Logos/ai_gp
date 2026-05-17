@@ -38,4 +38,15 @@ public record EmailOrPhoneAccount(IdentityType identityType, String identifier) 
 		}
 		throw new IllegalArgumentException("账号须为有效邮箱或 11 位中国大陆手机号");
 	}
+
+	/**
+	 * 仅接受邮箱（注册发码/提交注册用）；若为手机号或其他格式则抛出 {@link IllegalArgumentException}。
+	 */
+	public static String requireEmailIdentifier(String raw) {
+		EmailOrPhoneAccount a = parse(raw);
+		if (a.identityType() != IdentityType.email) {
+			throw new IllegalArgumentException("须使用邮箱");
+		}
+		return a.identifier();
+	}
 }

@@ -1,10 +1,14 @@
 package com.aigp.demo.service;
 
 import com.aigp.demo.domain.user.AppUser;
+import com.aigp.demo.domain.user.IdentityType;
 import com.aigp.demo.exception.NotFoundException;
 import com.aigp.demo.exception.UnauthorizedException;
 import com.aigp.demo.repository.AppUserRepository;
+import com.aigp.demo.repository.UserIdentityRepository;
 import com.aigp.demo.support.UidGenerator;
+import com.aigp.demo.web.user.dto.UserProfileResponse;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,9 +17,13 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AppUserService {
 
+	private static final Pattern CN_MOBILE = Pattern.compile("^1[3-9]\\d{9}$");
+
 	private final AppUserRepository appUserRepository;
 	private final UserNotificationSettingsService userNotificationSettingsService;
 	private final UserSessionService userSessionService;
+	private final UserIdentityRepository userIdentityRepository;
+	private final UserIdentityService userIdentityService;
 
 	@Transactional(readOnly = true)
 	public AppUser requireById(Long id) {
@@ -63,8 +71,28 @@ public class AppUserService {
 		return user;
 	}
 
+	@Transactional(readOnly = true)
+	public UserProfileResponse toProfileResponse(AppUser user) {
+		String phoneMasked = maskedPhoneForUser(user.getId());
+		return UserProfileResponse.fromEntity(user, phoneMasked);
+	}
+
+	private String maskedPhoneForUser(Long userId) {
+		return userIdentityRepository
+				.findByUser_IdAndIdentityType(userId, IdentityType.phone)
+				.map(id -> maskPhone(id.getIdentifier()))
+				.orElse(null);
+	}
+
+	private static String maskPhone(String phone) {
+		if (phone == null || phone.length() < 11) {
+			return phone;
+		}
+		return phone.substring(0, 3) + "****" + phone.substring(7);
+	}
+
 	@Transactional
-	public AppUser updateProfile(Long userId, String nickname, String avatarUrl, Integer weeklyHours) {
+	public AppUser updateProfile(Long userId, String nickname, String avatarUrl, Integer weeklyHours, String phone) {
 		AppUser user = requireActive(userId);
 		if (nickname != null) {
 			user.setNickname(nickname);
@@ -78,7 +106,45 @@ public class AppUserService {
 			}
 			user.setWeeklyHours(weeklyHours.byteValue());
 		}
+		if (org.springframework.util.StringUtils.hasText(phone)) {
+			String p = phone.trim();
+			if (!CN_MOBILE.matcher(p).matches()) {
+				throw new IllegalArgumentException("手机号须为 11 位中国大陆号码");
+			}
+			userIdentityService.linkIdentity(user, IdentityType.phone, p, null, false, null);
+		}
 		return user;
+	}
+
+	/**
+	 * 更新首次登录画像（身份、爱好、探索方向等）；字段为 null 表示不修改，空字符串会清空对应文本。
+	 */
+	@Transactional
+	public AppUser updateOnboardingProfile(
+			Long userId,
+			String identitySummary,
+			String hobbies,
+			String explorationInterests,
+			Boolean onboardingCompleted) {
+		AppUser user = requireActive(userId);
+		if (identitySummary != null) {
+			user.setProfileIdentity(blankToNull(identitySummary));
+		}
+		if (hobbies != null) {
+			user.setProfileHobbies(blankToNull(hobbies));
+		}
+		if (explorationInterests != null) {
+			user.setProfileExploration(blankToNull(explorationInterests));
+		}
+		if (onboardingCompleted != null) {
+			user.setOnboardingCompleted(onboardingCompleted);
+		}
+		return appUserRepository.save(user);
+	}
+
+	private static String blankToNull(String raw) {
+		String t = raw.trim();
+		return t.isEmpty() ? null : t;
 	}
 
 	/**
