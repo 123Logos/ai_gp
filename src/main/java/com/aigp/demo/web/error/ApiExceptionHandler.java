@@ -76,8 +76,13 @@ public class ApiExceptionHandler {
 
 	@ExceptionHandler(IllegalStateException.class)
 	public ResponseEntity<ApiErrorBody> illegalState(IllegalStateException ex) {
+		String msg = ex.getMessage() == null ? "服务暂不可用" : ex.getMessage();
+		if (msg.contains("语音服务") || msg.contains("本地语音")) {
+			return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+					.body(new ApiErrorBody("SPEECH_UNAVAILABLE", msg));
+		}
 		return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-				.body(new ApiErrorBody("SERVICE_UNAVAILABLE", ex.getMessage()));
+				.body(new ApiErrorBody("SERVICE_UNAVAILABLE", msg));
 	}
 
 	/**

@@ -48,8 +48,9 @@ flowchart TD
    - 用户画像（昵称、爱好、每周小时数等）
    - 待办任务列表摘要
    - 是否开放任务管理工具  
-   规划失败时使用「全加载」的保守策略。
-4. **意图分析**（同上开关开启时）：再让大模型用几句话总结用户意图，**仅给正式回答参考**，不会原样展示给用户。
+   规划失败时使用「全加载」的保守策略。  
+   **快速路由**（`app.chat.fast-path-enabled=true`，默认开启）：问候、短句闲聊且不含待办/成长计划关键词时，**跳过规划 LLM**，仅启用 `chat`（续聊时加 `chat_history`），显著降低延迟。
+4. **意图分析**（多阶段开启且本轮路由含 `assistant_tasks` 时）：再让大模型用几句话总结用户意图，**仅给正式回答参考**，不会原样展示给用户。纯闲聊路由会跳过本步。
 5. **正式回答**：将「系统说明书 +（可选）历史 + 用户本轮输入」发给配置的 AI 提供商（默认 **mimo**，可指定 **ollama**）。
 6. **任务工具**：当用户要记待办、查任务、改状态等，大模型可多次调用后端工具（默认最多 5 轮），工具结果再喂回模型，最后输出面向用户的一段话。
 7. **落库规则**：数据库里**只存两条**——本轮用户消息、本轮助手最终回复。中间的规划、意图分析、工具调用过程**不写入** `ai_chat_messages`。
@@ -61,6 +62,7 @@ flowchart TD
 |------|------|------|
 | `app.chat.default-provider` / `AI_CHAT_DEFAULT_PROVIDER` | 默认 AI 提供商 | `mimo` |
 | `app.chat.multi-phase-enabled` / `AI_CHAT_MULTI_PHASE_ENABLED` | 是否启用规划 + 意图分析 | `true` |
+| `app.chat.fast-path-enabled` / `AI_CHAT_FAST_PATH_ENABLED` | 闲聊是否跳过规划 LLM | `true` |
 | `app.chat.max-history-messages` | 正式回答带入的历史条数上限 | `24` |
 | `app.chat.max-tool-rounds` | 任务工具最多轮次 | `5` |
 | `app.chat.push-on-reply-enabled` | 对话回复是否 WebSocket 推送 | `true` |

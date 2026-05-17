@@ -18,6 +18,7 @@ import com.aigp.demo.web.ai.dto.AiChatMessageItemResponse;
 import com.aigp.demo.web.ai.dto.AiChatMessageListResponse;
 import com.aigp.demo.service.chat.AiChatCapabilityCatalog;
 import com.aigp.demo.service.chat.AiChatCapabilityId;
+import com.aigp.demo.service.chat.AiChatIntentSignals;
 import com.aigp.demo.service.chat.AiChatRoutePlan;
 import com.aigp.demo.service.chat.AiChatRouteResolver;
 import com.aigp.demo.web.ai.dto.AiChatResponse;
@@ -136,7 +137,9 @@ public class AiChatService {
 					+ "（本轮用户附带了 " + imageAssetIds.size() + " 张图片）";
 		}
 		boolean sessionHasMessages = StringUtils.hasText(historySnippet);
-		AiChatRoutePlan route = aiChatPlanningService.planRoute(providerConfig, userMessage, historySnippet);
+		boolean hasImagesThisTurn = !imageAssetIds.isEmpty();
+		AiChatRoutePlan route = aiChatPlanningService.planRoute(
+				providerConfig, userMessage, historySnippet, sessionHasMessages, hasImagesThisTurn);
 		route = routeResolver.refine(route, userMessage, historySnippet, sessionHasMessages);
 		pipelineDebugLog.step("route-refined", "capabilities=%s unsupported=%s", route.capabilities(), route.unsupported());
 
@@ -159,11 +162,14 @@ public class AiChatService {
 		List<Map<String, Object>> sessionHistoryForIntent = historyPayload.messages();
 
 		String intentHint = null;
-		if (appProperties.getChat().isMultiPhaseEnabled()) {
+		if (appProperties.getChat().isMultiPhaseEnabled()
+				&& route.hasCapability(AiChatCapabilityId.ASSISTANT_TASKS)) {
 			intentHint = aiChatPlanningService.analyzeUserIntent(
 					providerConfig, userMessage, sessionHistoryForIntent);
 			route = alignRouteWithIntentHint(route, intentHint);
 			pipelineDebugLog.step("route-after-intent", "capabilities=%s", route.capabilities());
+		} else if (appProperties.getChat().isMultiPhaseEnabled()) {
+			pipelineDebugLog.step("intent", "跳过：本轮未启用 assistant_tasks");
 		}
 
 		AiChatDataPlan plan = route.toDataPlan();
@@ -354,12 +360,8 @@ public class AiChatService {
 		if (route == null || !StringUtils.hasText(intentHint)) {
 			return route;
 		}
-		boolean wantsTasks = intentHint.contains("list_tasks")
-				|| intentHint.contains("create_task")
-				|| intentHint.contains("update_task")
-				|| intentHint.contains("delete_task")
-				|| intentHint.contains("get_task");
-		if (!wantsTasks || route.hasCapability(AiChatCapabilityId.ASSISTANT_TASKS)) {
+		if (!AiChatIntentSignals.suggestsTaskTools(intentHint)
+				|| route.hasCapability(AiChatCapabilityId.ASSISTANT_TASKS)) {
 			return route;
 		}
 		java.util.Set<AiChatCapabilityId> caps = new java.util.LinkedHashSet<>(route.capabilities());

@@ -552,6 +552,8 @@ const profile = await res.json();
 |------|------|
 | `md文档/环境与密钥配置.md` | JWT、.env、dev/prod 配置分层 |
 | `md文档/HTTP接口-AI对话与通知.md` | AI 对话、助手任务、站内通知、WebSocket |
+| `md文档/HTTP接口-语音转写.md` | 上传语音 → 文本 → 再发 AI 对话 |
+| `md文档/本地语音转写-STT部署.md` | 内网 Whisper STT Docker 部署 |
 | `md文档/AI对话与助手任务-流程说明.md` | 对话与提醒业务流程（非接口字段） |
 
 ---

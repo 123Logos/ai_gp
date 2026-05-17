@@ -1,0 +1,92 @@
+openapi: 3.0.3
+info:
+  title: AI GP - 语音转写 API
+  version: 1.0.0
+  description: |
+    前端上传语音，后端转发内网 STT 服务并返回文本。
+    部署 STT 见 `md文档/本地语音转写-STT部署.md`；联调说明见 `md文档/HTTP接口-语音转写.md`。
+
+servers:
+  - url: http://localhost:8000
+
+tags:
+  - name: 语音转写
+
+paths:
+  /api/v1/speech/transcribe:
+    post:
+      tags: [语音转写]
+      summary: 语音转文字
+      description: |
+        multipart 字段名必须为 **file**。
+        成功后将返回的 `text` 作为 `POST /api/v1/ai/chat` 的 `message`。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: webm / wav / mp3 / ogg 等
+      responses:
+        "200":
+          description: 识别成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpeechTranscribeResponse"
+              example:
+                text: 帮我记一下明天下午三点开会
+        "400":
+          description: 文件非法、未识别到内容或 STT 返回错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: 未登录
+        "503":
+          description: 功能关闭或无法连接内网 STT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              examples:
+                disabled:
+                  value:
+                    code: SPEECH_DISABLED
+                    message: 语音转写功能未开启
+                unavailable:
+                  value:
+                    code: SPEECH_UNAVAILABLE
+                    message: 无法连接本地语音服务 http://127.0.0.1:9000…
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    SpeechTranscribeResponse:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          description: 识别文本

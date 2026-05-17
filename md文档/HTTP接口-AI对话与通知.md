@@ -5,6 +5,8 @@
 
 业务流程（非接口细节）见 **`md文档/AI对话与助手任务-流程说明.md`**。
 
+**语音输入**：先 **`POST /api/v1/speech/transcribe`** 得到 `text`，再作为本章 `POST /api/v1/ai/chat` 的 `message`。见 **`md文档/HTTP接口-语音转写.md`**。
+
 ---
 
 ## 1. 通用约定
@@ -20,6 +22,7 @@
 |------|----------|
 | `FEATURE_UNAVAILABLE` | AI 提供商未配置或 MiMo 无 API Key |
 | `NOT_FOUND` | 会话不存在或不属于当前用户 |
+| `SPEECH_DISABLED` / `SPEECH_UNAVAILABLE` | 语音转写未开启或内网 STT 未启动 |
 
 ---
 

@@ -20,6 +20,7 @@ SCRIPTS = [
     "mysql-user-llm-settings.sql",
     "mysql-scheduler-lock.sql",
     "mysql-user-assistant-tasks-reminder-index.sql",
+    "mysql-user-companion-memory.sql",
 ]
 
 # 与 application-dev.yaml 默认一致；可用环境变量覆盖

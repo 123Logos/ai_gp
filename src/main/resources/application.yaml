@@ -97,6 +97,7 @@ app:
     max-history-messages: ${AI_CHAT_MAX_HISTORY:24}
     max-tool-rounds: ${AI_CHAT_MAX_TOOL_ROUNDS:5}
     multi-phase-enabled: ${AI_CHAT_MULTI_PHASE_ENABLED:true}
+    fast-path-enabled: ${AI_CHAT_FAST_PATH_ENABLED:true}
     planning-history-snippet-messages: ${AI_CHAT_PLANNING_HISTORY_SNIPPET:6}
     push-on-reply-enabled: ${AI_CHAT_PUSH_ON_REPLY:true}
     # 保存 PUT /users/me/llm/settings 时探测 apiKey/baseUrl/model 是否可用
@@ -133,3 +134,16 @@ app:
     digest-push-enabled: ${APP_COMPANION_MEMORY_DIGEST_PUSH:true}
     max-messages-per-week: ${APP_COMPANION_MEMORY_MAX_MSG_PER_WEEK:200}
     max-memory-chars: ${APP_COMPANION_MEMORY_MAX_CHARS:12000}
+  # 语音转写：前端 multipart → Java → 内网 STT（见 md文档/本地语音转写-STT部署.md）
+  speech:
+    enabled: ${APP_SPEECH_ENABLED:true}
+    base-url: ${APP_SPEECH_BASE_URL:http://127.0.0.1:9000}
+    transcribe-path: ${APP_SPEECH_TRANSCRIBE_PATH:/asr}
+    upstream-file-part-name: ${APP_SPEECH_UPSTREAM_FILE_PART:audio_file}
+    query-language: ${APP_SPEECH_QUERY_LANGUAGE:zh}
+    query-output: ${APP_SPEECH_QUERY_OUTPUT:json}
+    query-encode: ${APP_SPEECH_QUERY_ENCODE:true}
+    query-task: ${APP_SPEECH_QUERY_TASK:transcribe}
+    max-audio-bytes: ${APP_SPEECH_MAX_BYTES:10485760}
+    connect-timeout-ms: ${APP_SPEECH_CONNECT_TIMEOUT_MS:5000}
+    read-timeout-ms: ${APP_SPEECH_READ_TIMEOUT_MS:120000}

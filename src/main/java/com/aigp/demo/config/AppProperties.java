@@ -19,6 +19,7 @@ public class AppProperties {
 	private final Chat chat = new Chat();
 	private final TaskReminder taskReminder = new TaskReminder();
 	private final CompanionMemory companionMemory = new CompanionMemory();
+	private final Speech speech = new Speech();
 
 	/** 本地上传根目录（相对路径基于进程工作目录） */
 	private String uploadPath = "uploads";
@@ -98,6 +99,8 @@ public class AppProperties {
 		private int maxToolRounds = 5;
 		/** 是否启用「先规划数据 → 意图分析 → 执行」多阶段（中间过程不落库） */
 		private boolean multiPhaseEnabled = true;
+		/** 闲聊/短句走确定性路由，跳过 plan（及无任务时的 intent）以降低延迟 */
+		private boolean fastPathEnabled = true;
 		/** 规划阶段带入的最近对话条数（仅 USER/ASSISTANT 文本摘要） */
 		private int planningHistorySnippetMessages = 6;
 		/** 对话回复完成后是否 WebSocket 推送 CHAT_REPLY（用户在线时） */
@@ -155,5 +158,27 @@ public class AppProperties {
 		private int maxMessagesPerWeek = 200;
 		/** 长期记忆最大字符数（超出则截断） */
 		private int maxMemoryChars = 12000;
+	}
+
+	/**
+	 * 语音转写：Java 转发至内网 Whisper ASR HTTP（默认 whisper-asr-webservice 约定）。
+	 */
+	@Getter
+	@Setter
+	public static class Speech {
+		private boolean enabled = true;
+		/** 内网 STT 根地址，仅服务端访问，勿暴露公网 */
+		private String baseUrl = "http://127.0.0.1:9000";
+		/** 转写路径，whisper-asr-webservice 默认为 /asr */
+		private String transcribePath = "/asr";
+		/** 转发至 STT 时的 multipart 字段名（whisper-asr-webservice 为 audio_file） */
+		private String upstreamFilePartName = "audio_file";
+		private String queryLanguage = "zh";
+		private String queryOutput = "json";
+		private boolean queryEncode = true;
+		private String queryTask = "transcribe";
+		private long maxAudioBytes = 10L * 1024 * 1024;
+		private int connectTimeoutMs = 5000;
+		private int readTimeoutMs = 120000;
 	}
 }

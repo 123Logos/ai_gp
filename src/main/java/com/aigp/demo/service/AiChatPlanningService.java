@@ -2,6 +2,7 @@ package com.aigp.demo.service;
 
 import com.aigp.demo.config.AppProperties;
 import com.aigp.demo.service.chat.AiChatCapabilityCatalog;
+import com.aigp.demo.service.chat.AiChatFastPath;
 import com.aigp.demo.service.chat.AiChatRoutePlan;
 import com.aigp.demo.service.chat.AiChatRouteResolver;
 import com.aigp.demo.support.llm.AiChatPipelineDebugLog;
@@ -44,10 +45,21 @@ public class AiChatPlanningService {
 	private final AiChatRouteResolver routeResolver;
 
 	public AiChatRoutePlan planRoute(
-			AppProperties.ChatProvider provider, String userMessage, String recentHistorySnippet) {
+			AppProperties.ChatProvider provider,
+			String userMessage,
+			String recentHistorySnippet,
+			boolean sessionHasMessages,
+			boolean hasImages) {
 		if (!appProperties.getChat().isMultiPhaseEnabled()) {
 			pipelineDebugLog.step("plan", "多阶段已关闭，使用默认路由");
 			return AiChatRoutePlan.defaults();
+		}
+		if (appProperties.getChat().isFastPathEnabled()) {
+			var fast = AiChatFastPath.tryPlan(userMessage, recentHistorySnippet, sessionHasMessages, hasImages);
+			if (fast.isPresent()) {
+				pipelineDebugLog.step("plan", "快速路由 capabilities=%s", fast.get().capabilities());
+				return fast.get();
+			}
 		}
 		StringBuilder userContent = new StringBuilder();
 		userContent.append("用户本轮输入：\n").append(userMessage);

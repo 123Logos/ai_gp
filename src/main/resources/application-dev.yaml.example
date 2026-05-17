@@ -28,8 +28,13 @@ spring:
           ssl:
             enable: true
 
-# AI 对话：MiMo 百亿 Token 计划 Key；本地调试可改 default-provider 为 ollama
+# 对外 URL（头像 avatarUrl 等）；端口须与 server.port / PORT 一致
 app:
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
+  # 语音转写：须先 docker 启动 whisper-asr（127.0.0.1:9000），见 md文档/本地语音转写-STT部署.md
+  speech:
+    enabled: ${APP_SPEECH_ENABLED:true}
+    base-url: ${APP_SPEECH_BASE_URL:http://127.0.0.1:9000}
   jwt:
     # 优先 .env 中的 JWT_SECRET_KEY；未设置时用下方占位（仅本地，≥32 字符）
     secret-key: ${JWT_SECRET_KEY:local-dev-jwt-secret-do-not-use-in-production!!}
