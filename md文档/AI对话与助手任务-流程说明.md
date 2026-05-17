@@ -91,24 +91,76 @@ flowchart TD
 
 ---
 
-## 5. 定时任务提醒（用户未主动说话）
+## 5. 定时任务提醒（用户未主动说话，精确到分）
 
 ```mermaid
 flowchart LR
-    T[定时任务 默认每天 8:00] --> U[扫描到期且 OPEN 的助手任务]
-    U --> V{用户开启 daily_task_reminder?}
-    V -->|否| W[跳过]
-    V -->|是| X[在「任务提醒」会话插入助手消息]
-    X --> Y[写站内通知 + WebSocket]
+    T[每分钟 cron] --> L[scheduler_lock 单飞]
+    L --> U[粗筛 OPEN 任务候选]
+    U --> Z{用户本地 due_at 已到?}
+    Z -->|否| W[跳过]
+    Z -->|是| V{daily_task_reminder 开?}
+    V -->|否| W
+    V -->|是| X[「任务提醒」会话 + 站内通知 + WS]
 ```
 
-- **触发**：`AssistantTaskReminderScheduler`，cron 默认 `0 0 8 * * ?`（上海时区可配）。
-- **条件**：任务 `due_date` 不晚于用户当地「今天」、状态为 `OPEN`、当日尚未发过提醒、用户 `daily_task_reminder` 开关为开。
-- **内容**：由后端按模板生成（逾期 / 今日待办），**不是**现场调用大模型生成。
-- **会话**：每个用户固定一个标题为 **「任务提醒」** 的会话；提醒消息以 `ASSISTANT` 角色写入，便于用户在聊天里继续回复「完成了」等，再由 AI 调工具更新任务。
-- **通知**：写入 `user_in_app_notifications`，类型 `TASK_DUE_REMINDER`；若开启推送则 WebSocket 下发（见下节）。
+- **触发**：`AssistantTaskReminderScheduler`，cron 默认 **`0 * * * * ?`**（每分钟，时区见 `app.task-reminder.zone`）。
+- **到点规则**：
+  - 有 **`due_at`**（`yyyy-MM-dd HH:mm`，用户本地）：当前用户当地时间 ≥ `due_at` 且尚未针对该次到期发过提醒 → 发送。
+  - 仅有 **`due_date`**：在截止日当天 **`app.task-reminder.default-due-date-reminder-time`**（默认 `08:00`）发送。
+- **幂等**：`reminder_sent_at` 不早于本次到期时刻则不再重复发；用户修改 `due_at` 后可再次提醒。
+- **多实例**：`scheduler_lock` 表互斥，避免重复投递。
+- **内容**：模板文案（非现场调大模型）。
+- **会话**：固定 **「任务提醒」** 会话，`ASSISTANT` 消息。
+- **通知**：`user_in_app_notifications` + 可选 WebSocket（见下节）。
 
-相关配置：`app.task-reminder.enabled`、`in-app-enabled`、`push-enabled`、`cron`、`zone`。
+相关配置：`enabled`、`in-app-enabled`、`push-enabled`、`cron`、`zone`、`default-due-date-reminder-time`。  
+数据库：`scripts/mysql-scheduler-lock.sql`、`scripts/mysql-user-assistant-tasks-reminder-index.sql`（或 `run-mysql-migrations.py`）。
+
+---
+
+## 5.5 陪伴记忆与每周回顾（周六 03:00 总结，08:00 推送）
+
+```mermaid
+flowchart TD
+    S[周六 03:00 cron] --> L[scheduler_lock 单飞]
+    L --> U[扫描近 7 天有对话的用户]
+    U --> W1[LLM：先总结本周]
+    W1 --> W2[LLM：合并长期记忆 分层压缩]
+    W2 --> DB[(user_companion_memory)]
+    M[每分钟 cron] --> D{用户本地周六 08:00?}
+    D -->|是| P[weekly_companion_digest 开?]
+    P -->|是| N[「本周回顾」会话 + 站内通知 + WS]
+    DB --> W1
+    DB --> N
+```
+
+### 分步说明
+
+1. **总结（周六凌晨，默认 03:00，`app.companion-memory.summarize-cron`）**  
+   - 读取用户近 7 天对话（排除「任务提醒」「本周回顾」系统会话）及本周任务变更统计。  
+   - **第一步**：生成本周内部总结 + 给用户看的 `pending_digest_text`。  
+   - **第二步**：结合旧 `memory_text` 与画像，**重写**长期记忆（非无限追加）：最近几周较详细；1～2 月前保留里程碑；更早仅事件名+日期段；锻炼/学习/开会等例行活动按月/周汇总次数或时长。  
+   - 写入 `user_companion_memory`，周键 `summarized_week_key`（如 `2026-W20`）幂等。
+
+2. **对话注入**  
+   - 每轮 `POST /api/v1/ai/chat` 在 system 中附带 `memory_text`（与本轮用户说法冲突时以本轮为准）。
+
+3. **推送（与任务提醒同一分钟 tick）**  
+   - 用户本地 **周六**、时刻 **`digest-delivery-time`（默认 08:00）**，且 `weekly_companion_digest=true`。  
+   - 投递至固定会话 **「本周回顾」**，通知类型 `WEEKLY_COMPANION_DIGEST`。
+
+### 相关配置
+
+| 配置 | 含义 | 默认 |
+|------|------|------|
+| `app.companion-memory.enabled` | 是否启用周总结 | `true` |
+| `app.companion-memory.summarize-cron` | 总结 cron | `0 0 3 ? * SAT` |
+| `app.companion-memory.digest-delivery-time` | 用户本地推送时刻 | `08:00` |
+| `app.companion-memory.max-messages-per-week` | 单周纳入总结的消息上限 | `200` |
+| `app.companion-memory.max-memory-chars` | 长期记忆最大字符 | `12000` |
+
+数据库：`scripts/mysql-user-companion-memory.sql` 或 `scripts/mysql-existing-database-changes.sql`。
 
 ---
 
@@ -149,6 +201,21 @@ flowchart LR
 }
 ```
 
+**每周陪伴回顾**（`app.companion-memory.digest-push-enabled=true`）：
+
+```json
+{
+  "type": "WEEKLY_COMPANION_DIGEST",
+  "notificationId": 11,
+  "sessionId": 3,
+  "messageId": 60,
+  "taskId": null,
+  "title": "本周回顾 · 2026-W20",
+  "body": "这一周你…",
+  "unreadCount": 2
+}
+```
+
 `unreadCount` 为当前用户**站内通知**未读条数（不含聊天已读状态）。
 
 ---
@@ -166,7 +233,10 @@ flowchart LR
 
 1. `mysql-ai-chat.sql` — 会话、消息、助手任务表  
 2. `mysql-ai-chat-task-reminder.sql` — 任务表增加 `reminder_sent_at`（若已含于建表脚本可跳过）  
-3. `mysql-in-app-notifications.sql` — 站内通知表  
+3. `mysql-user-assistant-tasks-due-at.sql` — `due_at` 列（若建表已含可跳过）  
+4. `mysql-in-app-notifications.sql` — 站内通知表  
+5. `mysql-scheduler-lock.sql`、`mysql-user-assistant-tasks-reminder-index.sql` — 提醒单飞锁与扫描索引  
+6. `mysql-user-companion-memory.sql` 或 `mysql-existing-database-changes.sql` — 陪伴记忆表与通知开关列  
 
 应用使用 `ddl-auto: validate` 时，须先执行脚本再启动。
 
@@ -182,6 +252,7 @@ flowchart LR
 | 任务工具执行 | `AiChatToolExecutor` |
 | 大模型 HTTP 客户端 | `OpenAiCompatibleChatClient` |
 | 到期提醒 | `AssistantTaskReminderService`、`AssistantTaskReminderScheduler` |
+| 陪伴记忆周总结 | `CompanionMemoryService`、`CompanionMemoryScheduler` |
 | 提醒专用会话 | `AiChatReminderSessionService` |
 | 站内通知 + 推送 | `InAppNotificationService`、`ChatRealtimePushService` |
 

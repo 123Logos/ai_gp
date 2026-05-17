@@ -16,17 +16,30 @@ public class AiChatReminderSessionService {
 
 	public static final String REMINDER_SESSION_TITLE = "任务提醒";
 
+	/** 每周陪伴回顾推送会话（不参与周总结素材） */
+	public static final String WEEKLY_DIGEST_SESSION_TITLE = "本周回顾";
+
 	private final AiChatSessionRepository aiChatSessionRepository;
 	private final AiChatMessageRepository aiChatMessageRepository;
 
 	@Transactional
 	public AiChatSession getOrCreateReminderSession(AppUser user, String provider, String model) {
+		return getOrCreateSessionByTitle(user, REMINDER_SESSION_TITLE, provider, model);
+	}
+
+	@Transactional
+	public AiChatSession getOrCreateWeeklyDigestSession(AppUser user, String provider, String model) {
+		return getOrCreateSessionByTitle(user, WEEKLY_DIGEST_SESSION_TITLE, provider, model);
+	}
+
+	private AiChatSession getOrCreateSessionByTitle(
+			AppUser user, String title, String provider, String model) {
 		return aiChatSessionRepository
-				.findFirstByUser_IdAndTitle(user.getId(), REMINDER_SESSION_TITLE)
+				.findFirstByUser_IdAndTitle(user.getId(), title)
 				.orElseGet(() -> {
 					AiChatSession session = new AiChatSession();
 					session.setUser(user);
-					session.setTitle(REMINDER_SESSION_TITLE);
+					session.setTitle(title);
 					session.setProvider(provider);
 					session.setModel(model);
 					return aiChatSessionRepository.save(session);

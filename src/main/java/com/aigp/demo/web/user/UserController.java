@@ -2,6 +2,7 @@ package com.aigp.demo.web.user;
 
 import com.aigp.demo.service.AppUserService;
 import com.aigp.demo.service.UserAssistantTaskService;
+import com.aigp.demo.service.UserAvatarService;
 import com.aigp.demo.web.security.CurrentUser;
 import com.aigp.demo.web.security.JwtUserClaims;
 import com.aigp.demo.web.user.dto.PatchOnboardingRequest;
@@ -14,15 +15,19 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 当前登录用户资料：查询、修改与注销（软删除）。
@@ -37,6 +42,7 @@ public class UserController {
 
 	private final AppUserService appUserService;
 	private final UserAssistantTaskService userAssistantTaskService;
+	private final UserAvatarService userAvatarService;
 
 	/**
 	 * [当前用户] 返回基本画像字段（需有效访问令牌且账号状态为正常）。
@@ -56,6 +62,16 @@ public class UserController {
 	public UserProfileResponse patchMe(@CurrentUser JwtUserClaims user, @Valid @RequestBody UpdateProfileRequest body) {
 		var updated = appUserService.updateProfile(
 				user.userId(), body.nickname(), body.avatarUrl(), body.weeklyHours(), body.phone());
+		return appUserService.toProfileResponse(updated);
+	}
+
+	/**
+	 * [上传头像] 保存图片并自动更新 {@code avatarUrl} 为公开地址（GET /api/v1/public/avatars/{uid}，无需 Token）。
+	 */
+	@PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	@Operation(summary = "上传头像并自动更新资料")
+	public UserProfileResponse uploadAvatar(@CurrentUser JwtUserClaims user, @RequestPart("file") MultipartFile file) {
+		var updated = userAvatarService.uploadAndBindAvatar(user.userId(), file);
 		return appUserService.toProfileResponse(updated);
 	}
 

@@ -34,6 +34,9 @@ public class UserNotificationSettings {
 	@Column(name = "daily_task_reminder", nullable = false)
 	private boolean dailyTaskReminder = true;
 
+	@Column(name = "weekly_companion_digest", nullable = false)
+	private boolean weeklyCompanionDigest = true;
+
 	@Column(name = "conflict_alert", nullable = false)
 	private boolean conflictAlert = true;
 

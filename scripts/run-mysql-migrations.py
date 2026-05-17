@@ -17,6 +17,9 @@ SCRIPTS = [
     "mysql-user-assistant-tasks-due-at.sql",
     "mysql-user-media-assets.sql",
     "mysql-in-app-notifications.sql",
+    "mysql-user-llm-settings.sql",
+    "mysql-scheduler-lock.sql",
+    "mysql-user-assistant-tasks-reminder-index.sql",
 ]
 
 # 与 application-dev.yaml 默认一致；可用环境变量覆盖

@@ -18,6 +18,7 @@ public class AppProperties {
 	private final Vlm vlm = new Vlm();
 	private final Chat chat = new Chat();
 	private final TaskReminder taskReminder = new TaskReminder();
+	private final CompanionMemory companionMemory = new CompanionMemory();
 
 	/** 本地上传根目录（相对路径基于进程工作目录） */
 	private String uploadPath = "uploads";
@@ -101,6 +102,8 @@ public class AppProperties {
 		private int planningHistorySnippetMessages = 6;
 		/** 对话回复完成后是否 WebSocket 推送 CHAT_REPLY（用户在线时） */
 		private boolean pushOnReplyEnabled = true;
+		/** 保存用户 LLM 设置（PUT settings）时是否探测 apiKey/baseUrl/model 可用 */
+		private boolean validateLlmSettingsOnSave = true;
 		/** 为 true 时输出 AI 对话中间过程调试记录（规划/模型/工具）；生产务必 false */
 		private boolean pipelineDebugLogEnabled = false;
 		/** 中间过程追加写入的 txt 路径（相对路径基于进程工作目录，如 logs/ai-chat-pipeline.txt） */
@@ -125,8 +128,32 @@ public class AppProperties {
 		private boolean inAppEnabled = true;
 		/** 站内通知创建后 WebSocket 推送给在线用户 */
 		private boolean pushEnabled = true;
-		/** 每日触发 cron，默认每天 8:00 */
-		private String cron = "0 0 8 * * ?";
+		/** 每分钟第 0 秒触发（按用户本地 due_at 到点提醒） */
+		private String cron = "0 * * * * ?";
 		private String zone = "Asia/Shanghai";
+		/** 仅 due_date、无 due_at 时，在截止日当天该时刻提醒（HH:mm） */
+		private String defaultDueDateReminderTime = "08:00";
+	}
+
+	/**
+	 * 用户陪伴记忆：每周六凌晨总结、周六早上与任务提醒一并推送本周回顾。
+	 */
+	@Getter
+	@Setter
+	public static class CompanionMemory {
+		private boolean enabled = true;
+		/** 每周六 03:00 执行「本周总结 + 合并长期记忆」 */
+		private String summarizeCron = "0 0 3 ? * SAT";
+		private String zone = "Asia/Shanghai";
+		/** 周六早上推送回顾的时刻（用户本地，默认与任务仅日期提醒同为 08:00） */
+		private String digestDeliveryTime = "08:00";
+		/** 写入「本周回顾」会话并生成站内通知 */
+		private boolean digestInAppEnabled = true;
+		/** 推送时是否 WebSocket 通知（与任务提醒 push 独立配置） */
+		private boolean digestPushEnabled = true;
+		/** 单用户单周纳入总结的对话消息条数上限 */
+		private int maxMessagesPerWeek = 200;
+		/** 长期记忆最大字符数（超出则截断） */
+		private int maxMemoryChars = 12000;
 	}
 }

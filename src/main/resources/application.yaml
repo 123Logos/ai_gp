@@ -99,6 +99,8 @@ app:
     multi-phase-enabled: ${AI_CHAT_MULTI_PHASE_ENABLED:true}
     planning-history-snippet-messages: ${AI_CHAT_PLANNING_HISTORY_SNIPPET:6}
     push-on-reply-enabled: ${AI_CHAT_PUSH_ON_REPLY:true}
+    # 保存 PUT /users/me/llm/settings 时探测 apiKey/baseUrl/model 是否可用
+    validate-llm-settings-on-save: ${AI_CHAT_VALIDATE_LLM_SETTINGS_ON_SAVE:true}
     # 为 true 时将中间过程追加写入 txt（仅调试，生产务必 false）
     pipeline-debug-log-enabled: ${AI_CHAT_PIPELINE_DEBUG_LOG:false}
     pipeline-debug-log-file: ${AI_CHAT_PIPELINE_DEBUG_LOG_FILE:logs/ai-chat-pipeline.txt}
@@ -117,5 +119,17 @@ app:
     enabled: ${APP_TASK_REMINDER_ENABLED:true}
     in-app-enabled: ${APP_TASK_REMINDER_IN_APP:true}
     push-enabled: ${APP_TASK_REMINDER_PUSH:true}
-    cron: ${APP_TASK_REMINDER_CRON:0 0 8 * * ?}
+    cron: ${APP_TASK_REMINDER_CRON:0 * * * * ?}
     zone: ${APP_TASK_REMINDER_ZONE:Asia/Shanghai}
+    # 任务只有 due_date、没有 due_at 时，在截止日当天该时刻提醒（用户本地）
+    default-due-date-reminder-time: ${APP_TASK_REMINDER_DEFAULT_TIME:08:00}
+  # 陪伴记忆：周六 03:00 总结，周六 08:00（用户本地）与任务提醒一并推送本周回顾
+  companion-memory:
+    enabled: ${APP_COMPANION_MEMORY_ENABLED:true}
+    summarize-cron: ${APP_COMPANION_MEMORY_SUMMARIZE_CRON:0 0 3 ? * SAT}
+    zone: ${APP_COMPANION_MEMORY_ZONE:Asia/Shanghai}
+    digest-delivery-time: ${APP_COMPANION_MEMORY_DIGEST_TIME:08:00}
+    digest-in-app-enabled: ${APP_COMPANION_MEMORY_DIGEST_IN_APP:true}
+    digest-push-enabled: ${APP_COMPANION_MEMORY_DIGEST_PUSH:true}
+    max-messages-per-week: ${APP_COMPANION_MEMORY_MAX_MSG_PER_WEEK:200}
+    max-memory-chars: ${APP_COMPANION_MEMORY_MAX_CHARS:12000}

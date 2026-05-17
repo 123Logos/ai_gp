@@ -27,6 +27,47 @@ public class OpenAiCompatibleChatClient {
 	}
 
 	/**
+	 * 保存 LLM 设置前探测：发起一次最小 chat/completions 调用，失败时抛出带用户提示的 {@link IllegalArgumentException}。
+	 */
+	public void probeConnectivity(AppProperties.ChatProvider provider) {
+		if (!StringUtils.hasText(provider.getBaseUrl()) || !StringUtils.hasText(provider.getModel())) {
+			throw new IllegalArgumentException("baseUrl 与 model 均不能为空");
+		}
+		List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", "ping"));
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("model", provider.getModel().trim());
+		body.put("messages", messages);
+		body.put("max_tokens", 1);
+
+		RestClient client = buildRestClient(provider);
+		try {
+			String responseJson = client
+					.post()
+					.uri("/chat/completions")
+					.contentType(MediaType.APPLICATION_JSON)
+					.body(body)
+					.retrieve()
+					.body(String.class);
+			parseResponse(responseJson);
+		} catch (IllegalArgumentException ex) {
+			throw ex;
+		} catch (Exception ex) {
+			String message = LlmConnectivityMessages.fromException(
+					ex, provider.getBaseUrl(), provider.getModel(), objectMapper);
+			throw new IllegalArgumentException(message, ex);
+		}
+	}
+
+	private RestClient buildRestClient(AppProperties.ChatProvider provider) {
+		RestClient.Builder builder =
+				RestClient.builder().baseUrl(normalizeBaseUrl(provider.getBaseUrl()));
+		if (StringUtils.hasText(provider.getApiKey())) {
+			builder.defaultHeader("Authorization", "Bearer " + provider.getApiKey().trim());
+		}
+		return builder.build();
+	}
+
+	/**
 	 * @param debugPhase 调试日志阶段名（如 plan / intent / execute-r1），仅 pipeline-debug 开启时输出
 	 */
 	public ChatCompletionResult chat(
@@ -42,12 +83,7 @@ public class OpenAiCompatibleChatClient {
 			body.put("tool_choice", "auto");
 		}
 
-		RestClient.Builder builder =
-				RestClient.builder().baseUrl(normalizeBaseUrl(provider.getBaseUrl()));
-		if (StringUtils.hasText(provider.getApiKey())) {
-			builder.defaultHeader("Authorization", "Bearer " + provider.getApiKey().trim());
-		}
-		RestClient client = builder.build();
+		RestClient client = buildRestClient(provider);
 
 		String phase = debugPhase == null ? "llm" : debugPhase;
 		pipelineDebugLog.llmRequest(phase, provider.getModel(), messages, tools);

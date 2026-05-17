@@ -47,7 +47,8 @@ public class InAppNotificationService {
 		n.setMessageId(messageId);
 		n = userInAppNotificationRepository.save(n);
 
-		if (appProperties.getTaskReminder().isPushEnabled()) {
+		boolean push = shouldPushForType(type);
+		if (push) {
 			long unread = userInAppNotificationRepository.countByUser_IdAndReadAtIsNull(user.getId());
 			Map<String, Object> payload = new LinkedHashMap<>();
 			payload.put("type", type.name());
@@ -75,6 +76,13 @@ public class InAppNotificationService {
 		payload.put("contentPreview", preview(contentPreview));
 		payload.put("unreadCount", unread);
 		chatRealtimePushService.pushToUser(userId, payload);
+	}
+
+	private boolean shouldPushForType(InAppNotificationType type) {
+		if (type == InAppNotificationType.WEEKLY_COMPANION_DIGEST) {
+			return appProperties.getCompanionMemory().isDigestPushEnabled();
+		}
+		return appProperties.getTaskReminder().isPushEnabled();
 	}
 
 	private static String preview(String content) {

@@ -9,6 +9,7 @@ import com.aigp.demo.exception.NotFoundException;
 import com.aigp.demo.repository.AiChatMessageMediaRepository;
 import com.aigp.demo.repository.UserAssistantTaskMediaRepository;
 import com.aigp.demo.repository.UserMediaAssetRepository;
+import com.aigp.demo.support.ImageUploadSupport;
 import com.aigp.demo.web.media.dto.MediaAssetResponse;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,11 +21,9 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -34,9 +33,6 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class MediaAssetService {
 
-	private static final Set<String> ALLOWED_TYPES =
-			Set.of(MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE, "image/webp", "image/gif");
-
 	private final AppProperties appProperties;
 	private final AppUserService appUserService;
 	private final UserMediaAssetRepository userMediaAssetRepository;
@@ -45,19 +41,10 @@ public class MediaAssetService {
 
 	@Transactional
 	public MediaAssetResponse uploadImage(Long userId, MultipartFile file) {
-		if (file == null || file.isEmpty()) {
-			throw new IllegalArgumentException("请选择图片文件");
-		}
+		ImageUploadSupport.validateImage(file, appProperties.getMaxImageUploadBytes());
 		String contentType = file.getContentType();
-		if (!StringUtils.hasText(contentType) || !ALLOWED_TYPES.contains(contentType)) {
-			throw new IllegalArgumentException("仅支持 JPEG、PNG、WebP、GIF 图片");
-		}
-		if (file.getSize() > appProperties.getMaxImageUploadBytes()) {
-			throw new IllegalArgumentException("图片过大，单张不超过 "
-					+ (appProperties.getMaxImageUploadBytes() / 1024 / 1024) + "MB");
-		}
 		AppUser user = appUserService.requireActive(userId);
-		String ext = extensionFor(contentType);
+		String ext = ImageUploadSupport.extensionFor(contentType);
 		String storageKey = userId + "/" + UUID.randomUUID() + ext;
 		Path target = resolveUploadRoot().resolve(storageKey);
 		try {
@@ -235,15 +222,6 @@ public class MediaAssetService {
 			path = Paths.get(System.getProperty("user.dir")).resolve(path);
 		}
 		return path.normalize();
-	}
-
-	private static String extensionFor(String contentType) {
-		return switch (contentType) {
-			case MediaType.IMAGE_PNG_VALUE -> ".png";
-			case "image/webp" -> ".webp";
-			case "image/gif" -> ".gif";
-			default -> ".jpg";
-		};
 	}
 
 	public record MediaFile(byte[] bytes, String contentType) {}

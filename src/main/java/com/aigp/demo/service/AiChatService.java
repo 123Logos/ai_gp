@@ -66,6 +66,8 @@ public class AiChatService {
 	private final InAppNotificationService inAppNotificationService;
 	private final AiChatPipelineDebugLog pipelineDebugLog;
 	private final MediaAssetService mediaAssetService;
+	private final ChatProviderResolver chatProviderResolver;
+	private final UserLlmSettingsService userLlmSettingsService;
 
 	@Transactional
 	public AiChatResponse chat(
@@ -108,8 +110,8 @@ public class AiChatService {
 				sessionId,
 				providerOverride);
 		AppUser user = appUserService.requireActive(userId);
-		String providerKey = resolveProviderKey(providerOverride);
-		AppProperties.ChatProvider providerConfig = resolveProviderConfig(providerKey);
+		String providerKey = resolveProviderKey(userId, providerOverride);
+		AppProperties.ChatProvider providerConfig = chatProviderResolver.resolveForUser(userId, providerKey);
 
 		AiChatSession session = resolveSession(user, sessionId, providerKey, providerConfig.getModel());
 		pipelineDebugLog.step(
@@ -185,7 +187,7 @@ public class AiChatService {
 		llmMessages.add(userMessageForLlm(userMessage, currentImageUris));
 
 		boolean hasImages = !imageAssetIds.isEmpty() || historyPayload.hasImages();
-		AppProperties.ChatProvider executionProvider = resolveExecutionProvider(providerKey, hasImages);
+		AppProperties.ChatProvider executionProvider = resolveExecutionProvider(userId, providerKey, hasImages);
 
 		List<Map<String, Object>> tools = plan.needTaskTools() ? AiChatToolDefinitions.taskTools() : List.of();
 		pipelineDebugLog.step(
@@ -420,9 +422,9 @@ public class AiChatService {
 		return msg;
 	}
 
-	private AppProperties.ChatProvider resolveExecutionProvider(String providerKey, boolean hasImages) {
+	private AppProperties.ChatProvider resolveExecutionProvider(Long userId, String providerKey, boolean hasImages) {
 		if (!hasImages) {
-			return resolveProviderConfig(providerKey);
+			return chatProviderResolver.resolveForUser(userId, providerKey);
 		}
 		AppProperties.Vlm vlm = appProperties.getVlm();
 		if (!StringUtils.hasText(vlm.getApiKey()) || !StringUtils.hasText(vlm.getBaseUrl())) {
@@ -469,27 +471,11 @@ public class AiChatService {
 		return aiChatMessageRepository.save(msg);
 	}
 
-	private String resolveProviderKey(String providerOverride) {
+	private String resolveProviderKey(Long userId, String providerOverride) {
 		if (StringUtils.hasText(providerOverride)) {
-			return providerOverride.trim().toLowerCase(Locale.ROOT);
+			return chatProviderResolver.normalizeProviderKey(providerOverride);
 		}
-		String def = appProperties.getChat().getDefaultProvider();
-		return StringUtils.hasText(def) ? def.trim().toLowerCase(Locale.ROOT) : "mimo";
-	}
-
-	private AppProperties.ChatProvider resolveProviderConfig(String providerKey) {
-		AppProperties.ChatProvider cfg =
-				appProperties.getChat().getProviders().get(providerKey);
-		if (cfg == null || !StringUtils.hasText(cfg.getBaseUrl()) || !StringUtils.hasText(cfg.getModel())) {
-			throw new FeatureUnavailableException(
-					"CHAT_PROVIDER",
-					"未配置 AI 对话提供商「" + providerKey + "」，请检查 app.chat.providers");
-		}
-		if ("mimo".equals(providerKey) && !StringUtils.hasText(cfg.getApiKey())) {
-			throw new FeatureUnavailableException(
-					"CHAT_PROVIDER", "MiMo 未配置 API Key，请设置 MIMO_API_KEY 或 app.chat.providers.mimo.api-key");
-		}
-		return cfg;
+		return userLlmSettingsService.resolveEffectiveProviderKey(userId);
 	}
 
 	private static String truncate(String s, int max) {

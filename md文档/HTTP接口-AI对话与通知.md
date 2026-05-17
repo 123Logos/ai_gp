@@ -35,7 +35,10 @@
 |------|------|------|------|
 | message | string | 是 | 用户本轮输入，最长 8000 字符 |
 | sessionId | number | 否 | 继续已有会话时传入；不传则新建会话 |
-| provider | string | 否 | AI 提供商：`mimo`（默认）或 `ollama` |
+| provider | string | 否 | AI 提供商：`mimo`（默认）或 `ollama`；未传时使用用户在 **LLM 设置** 中的偏好 |
+
+- **密钥来源**：由 `GET/PUT /api/v1/users/me/llm/settings` 中的 `billingMode` 决定——`PLATFORM` 走服务端配置的 Key，`BYOK` 走用户保存的 Key。详见 **`md文档/HTTP接口-认证与用户.md`** 第 3.5 节。
+- **附图对话**：含图片时仍使用服务端 **VLM** 配置（`VLM_API_KEY`），与用户 BYOK 无关。
 
 - **200 响应体**（JSON）：
 
@@ -222,6 +225,21 @@
 | body | string | 通知正文 |
 | unreadCount | number | 站内通知未读数 |
 
+**每周陪伴回顾**（`type` = `WEEKLY_COMPANION_DIGEST`）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| type | string | 固定 `WEEKLY_COMPANION_DIGEST` |
+| notificationId | number | 通知 ID |
+| sessionId | number | 「本周回顾」会话 ID |
+| messageId | number | 会话内消息 ID |
+| taskId | null | 本类型无任务关联 |
+| title | string | 如 `本周回顾 · 2026-W20` |
+| body | string | 回顾正文预览（最长约 500 字） |
+| unreadCount | number | 站内通知未读数 |
+
+推送时刻：用户本地 **周六** `app.companion-memory.digest-delivery-time`（默认 `08:00`，与仅 `due_date` 任务提醒同窗）。需 `user_notification_settings.weekly_companion_digest=true`。
+
 ---
 
 ## 6. 配置与安全（部署备忘）
@@ -235,6 +253,10 @@
 | `APP_TASK_REMINDER_ENABLED` | 是否执行定时提醒 |
 | `APP_TASK_REMINDER_CRON` | 提醒 cron 表达式 |
 | `APP_TASK_REMINDER_PUSH` | 提醒是否 WebSocket 推送 |
+| `APP_COMPANION_MEMORY_ENABLED` | 是否启用每周陪伴记忆总结 |
+| `APP_COMPANION_MEMORY_SUMMARIZE_CRON` | 周总结 cron（默认周六 03:00） |
+| `APP_COMPANION_MEMORY_DIGEST_TIME` | 用户本地周六推送时刻（默认 08:00） |
+| `APP_COMPANION_MEMORY_DIGEST_PUSH` | 本周回顾是否 WebSocket 推送 |
 
 ---
 

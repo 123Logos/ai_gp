@@ -3,8 +3,9 @@ package com.aigp.demo.service;
 import com.aigp.demo.domain.user.AppUser;
 import com.aigp.demo.domain.user.IdentityType;
 import com.aigp.demo.repository.UserIdentityRepository;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +30,13 @@ public class AiChatUserContextBuilder {
 			- 用户说了具体时刻（如下午9点、21:00）时，用 create_task 的 dueAt，格式 yyyy-MM-dd HH:mm（精确到分）；仅「某天」无时刻时用 dueDate（yyyy-MM-dd）。
 			- 用户在上文已问过日期、本轮只回答「今天」「明天」等时，结合对话历史理解并直接创建任务。
 
-			日期格式：yyyy-MM-dd。请结合下方上下文回复；未提供的信息不要编造。
+			【提醒 / 记得 / 别忘了】
+			- 用户说「提醒我…」「记得…」「别忘了…」等且未给出具体几点时：必须调用 create_task 并填写 dueAt（yyyy-MM-dd HH:mm，精确到分）。
+			- 日期部分：未说明哪一天时，默认用【当前日期】；若该日已无合理提醒时刻，可用次日。
+			- 时刻部分：由你结合事项与【当前日期时间】推荐一个合理整点或半点（如喝水可约 1～2 小时后或下一整点），不要只填 dueDate 而无 dueAt。
+			- 用户已明确时刻时，严格按用户语义填写 dueAt，不要擅自改点。
+
+			日期格式：yyyy-MM-dd；时刻格式：yyyy-MM-dd HH:mm。请结合下方上下文回复；未提供的信息不要编造。
 			""";
 
 	private static final String TASK_TOOL_RULES =
@@ -42,6 +49,7 @@ public class AiChatUserContextBuilder {
 			""";
 
 	private final UserIdentityRepository userIdentityRepository;
+	private final CompanionMemoryService companionMemoryService;
 
 	public String buildSystemPrompt(
 			AppUser user,
@@ -90,6 +98,10 @@ public class AiChatUserContextBuilder {
 					.findByUser_IdAndIdentityType(user.getId(), IdentityType.phone)
 					.ifPresent(id -> appendLine(sb, "手机号", maskPhone(id.getIdentifier())));
 		}
+		companionMemoryService.getMemoryTextForChat(user.getId()).ifPresent(memory -> {
+			sb.append("\n【长期陪伴记忆（由系统每周整理，勿编造；与用户本轮说法冲突时以本轮为准）】\n");
+			sb.append(memory.trim()).append('\n');
+		});
 		if (plan == null || plan.needTaskList()) {
 			sb.append("\n【助手任务摘要（详细请用 list_tasks 查询）】\n");
 			if (StringUtils.hasText(tasksSummary)) {
@@ -101,10 +113,17 @@ public class AiChatUserContextBuilder {
 		return sb.toString();
 	}
 
+	private static final DateTimeFormatter CURRENT_DATETIME =
+			DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
 	private static void appendCurrentDate(StringBuilder sb, AppUser user) {
 		ZoneId zone = resolveZone(user.getTimezone());
-		LocalDate today = LocalDate.now(zone);
-		sb.append("\n【当前日期】").append(today).append("（时区 ").append(zone.getId()).append("）\n");
+		LocalDateTime now = LocalDateTime.now(zone);
+		sb.append("\n【当前日期时间】")
+				.append(now.format(CURRENT_DATETIME))
+				.append("（时区 ")
+				.append(zone.getId())
+				.append("）\n");
 	}
 
 	private static ZoneId resolveZone(String timezone) {

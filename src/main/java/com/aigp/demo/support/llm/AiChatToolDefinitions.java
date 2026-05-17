@@ -67,13 +67,13 @@ public final class AiChatToolDefinitions {
 												"type",
 												"string",
 												"description",
-												"仅日期时填 yyyy-MM-dd；若已填 dueAt 可省略"),
+												"仅「某天」无具体时刻的记待办时用 yyyy-MM-dd；提醒类或已有 dueAt 时不要单独填今天"),
 										"dueAt",
 										Map.of(
 												"type",
 												"string",
 												"description",
-												"截止时刻 yyyy-MM-dd HH:mm（用户本地，精确到分），有具体几点时用此项"),
+												"截止时刻 yyyy-MM-dd HH:mm（用户本地，精确到分）。用户说「提醒我」等但未给几点时必填，并由模型推荐合理时刻"),
 										"imageAssetIds",
 										Map.of(
 												"type",
